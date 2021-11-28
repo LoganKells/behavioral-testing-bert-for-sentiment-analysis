@@ -95,7 +95,7 @@ class TrainingParameters:
     num_works: int = 6
     batch_size: int = 32
     device: str = "cpu"
-    max_sequence_length: int = 50
+    max_sequence_length: int = 75
     model_save_path: PurePath = PROJECT_ROOT / "models" / "sentiment" / "bert_multilingual_amazon_reviews_hugging"
     data_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "data.pt"
     label_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "labels.pt"

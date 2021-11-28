@@ -100,8 +100,8 @@ class RunningParameters:
     num_works: int = 6
     device: str = "cpu"
     batch_size: int = 1
-    max_sequence_length: int = 50
-    model_selection: int = 1
+    max_sequence_length: int = 75
+    model_selection: tuple = (1,)  # Tuple selection related to get_model_selection(selection)
     data_path = str(PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data.pt")
     label_path = str(PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_labels.pt")
 
@@ -123,31 +123,32 @@ if __name__ == '__main__':
     # Parameters for running
     pars = RunningParameters
     pars.device = get_device()
-    pars.model_selection = 2
+    pars.model_selection = (1, 2)  # Configure which models to run.
 
     # Get the model to use
-    model_metadata = get_model_selection(selection=pars.model_selection)
-    model_path, prediction_path = model_metadata["model_path"], model_metadata["prediction_path"]
-    model_short_name = model_metadata["model_short_name"]
-    if ".pt" in model_path:
-        model = torch.load(model_path, map_location=pars.device)
-    else:
-        model = AutoModelForSequenceClassification.from_pretrained(model_path)
-    model = model.to(pars.device)
-    model = model.eval()
+    for selection in pars.model_selection:
+        model_metadata = get_model_selection(selection=selection)
+        model_path, prediction_path = model_metadata["model_path"], model_metadata["prediction_path"]
+        model_short_name = model_metadata["model_short_name"]
+        if ".pt" in model_path:
+            model = torch.load(model_path, map_location=pars.device)
+        else:
+            model = AutoModelForSequenceClassification.from_pretrained(model_path)
+        model = model.to(pars.device)
+        model = model.eval()
 
-    # Get the data to use with the model
-    data_loader = get_data_loader(pars.data_path, pars.label_path,
-                                  shuffle=False, num_workers=pars.num_works,
-                                  batch_size=pars.batch_size, max_sequence_length=pars.max_sequence_length)
+        # Get the data to use with the model
+        data_loader = get_data_loader(pars.data_path, pars.label_path,
+                                      shuffle=False, num_workers=pars.num_works,
+                                      batch_size=pars.batch_size, max_sequence_length=pars.max_sequence_length)
 
-    # Run the model to generate prediction
-    print(f"Running model: {model_path}")
-    prediction_lines = create_predictions(model, data_loader)
+        # Run the model to generate prediction
+        print(f"Running model: {model_path}")
+        prediction_lines = create_predictions(model, data_loader)
 
-    # Save the predictions to a .txt
-    prediction_file_path = PROJECT_ROOT / "predictions" / "sentiment" / "amazon_reviews" / prediction_path
-    save_predictions(prediction_lines, prediction_file_path, file_name=f"{model_short_name}.txt")
-    save_metadata(model_path, prediction_file_path, pars.data_path, pars.max_sequence_length)
+        # Save the predictions to a .txt
+        prediction_file_path = PROJECT_ROOT / "predictions" / "sentiment" / "amazon_reviews" / prediction_path
+        save_predictions(prediction_lines, prediction_file_path, file_name=f"{model_short_name}.txt")
+        save_metadata(model_path, prediction_file_path, pars.data_path, pars.max_sequence_length)
 
-    print(f"Predictions saved to: {prediction_file_path}")
+        print(f"Predictions saved to: {prediction_file_path}")

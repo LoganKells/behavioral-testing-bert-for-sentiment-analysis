@@ -1,3 +1,3 @@
 Model source: C:\Users\lkell\Documents\Projects\final_project_NLP_UTAustin\models\sentiment\bert_multilingual_amazon_reviews_hugging
 Data source: C:\Users\lkell\Documents\Projects\final_project_NLP_UTAustin\data\sentiment\amazon_reviews\test_data.pt
-Max sequence length of each sentence: 50
+Max sequence length of each sentence: 75
