@@ -219,7 +219,7 @@ def _parse_args() -> argparse.Namespace:
 @dataclass
 class RunningParametersAmazonReviews:
     run_tests_from_pkl: bool = False
-    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_500exs.csv"
+    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_100exs.csv"
     label_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_labels.pt"
     prediction_file_path: PurePath = PROJECT_ROOT / "predictions" / "sentiment" / "amazon_reviews" / "bert_trained" / "bert_multilingual.txt"
     suite_save_root: PurePath = PROJECT_ROOT / "test_suites" / "sentiment"
@@ -320,7 +320,7 @@ if __name__ == "__main__":
         for test_name, suite in test_suites.items():
             path_of_files = pars.suite_save_root / test_name
             save_build_suite(suite, save_path=path_of_files,
-                             file_name="test.pkl", samples=500)
+                             file_name="test.pkl", samples=100)
 
         # Save all the test_suite location data to a json, used if we skip rebuilding
         json_data = json.dumps(test_suite_paths)
