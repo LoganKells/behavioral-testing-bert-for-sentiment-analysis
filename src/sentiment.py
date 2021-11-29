@@ -1,43 +1,29 @@
 import argparse
+from dataclasses import dataclass
 from typing import List, Union, Tuple, Literal
+import os
+from pathlib import Path, PurePath
+import numpy as np
+import spacy
+import json
+
 from checklist.editor import Editor
 import checklist
-import spacy
 import itertools
-import csv
 import checklist.editor
 import checklist.text_generation
 from checklist.test_types import MFT, INV, DIR
 from checklist.expect import Expect
-import numpy as np
-import pandas as pd
-import spacy
 from checklist.test_suite import TestSuite
 from checklist.perturb import Perturb
-import os
-import sys
-from pathlib import Path
+from utils_airline_tweets import load_airline_tweets_data
+from utils_amazon_reviews import load_amazon_review_data, convert_txt_to_encoded_pt, get_data_loader
+from create_predictions import create_predictions, load_model, get_device, save_predictions, save_metadata
 
 PROJECT_ROOT = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def load_data(data_path: Union[str, object]) -> tuple:
-    # Load the data
-    data = pd.read_csv(data_path)
-    labels = data['airline_sentiment'].to_list()
-    confs = data['airline_sentiment_confidence'].to_list()
-    airlines = data['airline'].to_list()
-    sentences = data['text'].to_list()
-    reasons = data['negativereason'].to_list()
-
-    # Encode the labels
-    mapping = {'negative': 0, 'positive': 2, 'neutral': 1}
-    labels_encoded = np.array([mapping[x] for x in labels]).astype(int)
-
-    return labels_encoded, confs, airlines, sentences, reasons
-
-
-def load_editor(editor: Editor, suite_name: Literal["airline_tweets", "amazon_reviews"]) -> Tuple[Editor, dict]:
+def load_editor(editor: Editor, suite_name: str) -> Tuple[Editor, dict]:
     """
     This function will load predifined lexicon to the Editor. This lexicon is used when creating tests,
     such as in create_invariance_test_change_neutral_words().
@@ -47,7 +33,6 @@ def load_editor(editor: Editor, suite_name: Literal["airline_tweets", "amazon_re
     """
     # Text generator
     editor.tg
-
 
     pos_adj = ['good', 'great', 'excellent', 'amazing', 'extraordinary', 'beautiful', 'fantastic', 'nice', 'incredible',
                'exceptional', 'awesome', 'perfect', 'fun', 'happy', 'adorable', 'brilliant', 'exciting', 'sweet',
@@ -126,6 +111,7 @@ def create_mft_test_negation(suite: TestSuite, sentences: List[str], lexicon: di
 
     test = MFT(ret.data, labels=ret.labels, name='Simple negation', capability='Negation',
                description='Very simple negations.')
+    raise NotImplementedError("Need to finish this function")
 
 
 def create_invariance_test_change_neutral_words(suite: TestSuite, sentences: List[str], lexicon: dict) -> TestSuite:
@@ -171,35 +157,39 @@ def create_invariance_test_change_neutral_words(suite: TestSuite, sentences: Lis
     return suite
 
 
-def save_build_suite(suite: TestSuite, save_to_pkl_path: Union[str, object], samples: int) -> None:
+def save_build_suite(suite: TestSuite, save_path: Union[str, PurePath],
+                     file_name: str, samples: int) -> None:
     """
     This wrapper will save the TestSuite while also building for analysis.
     :param suite: TestSuite to build and save
-    :param save_to_pkl_path: Path-like object to save the .pkl file locally.
+    :param save_path: Path-like object to save the .pkl file locally.
+    :param file_name: .pkl file name to save the test suite
     :param samples: Number of samples to draw from for each suite.
     :return: None
     """
     # Make directory if missing
-    sentiment_path = PROJECT_ROOT / "test_suites" / "sentiment"
-    if not os.path.isdir(sentiment_path):
-        os.mkdir(sentiment_path)
+    if not os.path.isdir(save_path):
+        os.mkdir(save_path)
+
+    # Save the perturbed examples to a .txt and to a .pt file to be used in a model.
+    temp_file_path = save_path / "data.txt"
+    suite.to_raw_file(str(temp_file_path), n=samples, seed=1)  # Save .txt
+    convert_txt_to_encoded_pt(data_path=save_path, file_name="data.txt")  # Save .pt
 
     # Build the TestSuite
-    temp_file_path = sentiment_path / "temp"
-    suite.to_raw_file(str(temp_file_path), n=samples, seed=1)
     for test in suite.tests:
         suite.tests[test].name = test
         suite.tests[test].description = suite.info[test]['description]']
         suite.tests[test].capability = suite.info[test]['capability']
 
     # Save the TestSuite to a local .pkl file
-    suite.save(str(save_to_pkl_path))
+    suite.save(str(save_path / file_name))  # save .pkl
 
     # Clean up temp file
-    os.remove(temp_file_path)
+    # os.remove(temp_file_path)
 
 
-def run_analysis(suite_path: Union[str, object], pred_path: Union[str, object]) -> None:
+def run_analysis(suite_path: Union[str, PurePath], pred_path: Union[str, PurePath]) -> None:
     """
     Run the checklist provided in the TestSuite. The TestSuite contains the
     :param suite_path: Path-like object locating the suite.pkl file.
@@ -220,74 +210,147 @@ def _parse_args() -> argparse.Namespace:
     # Argument parsing
     parser = argparse.ArgumentParser(
         description="Create TestSuites and run analysis given training data and predictions.")
-    parser.add_argument("--training_data_file", required=True, type=str, default="Tweets.csv", choices=["Tweets.csv"])
-    parser.add_argument("--prediction_data_file", required=True, type=str, default="bert.txt",
-                        choices=["amazon.txt", "bert.txt"])
-    parser.add_argument("--suite_name", required=True, type=str, default="airline_tweets", help="Name for suite data.")
-    parser.add_argument("--run_from_built_pkl", action='store_true',
-                        help="Run the TestSuite loaded with training data and tests from a prebuilt pickle.")
+    parser.add_argument("--data_selection", required=True, type=str, default="airline_tweets",
+                        choices=["airline_tweets", "amazon_reviews"],
+                        help="This selection will configure all necessary parameters to generate the TestSuite.")
     return parser.parse_args()
+
+
+@dataclass
+class RunningParametersAmazonReviews:
+    run_tests_from_pkl: bool = False
+    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_500exs.csv"
+    label_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_labels.pt"
+    prediction_file_path: PurePath = PROJECT_ROOT / "predictions" / "sentiment" / "amazon_reviews" / "bert_trained" / "bert_multilingual.txt"
+    suite_save_root: PurePath = PROJECT_ROOT / "test_suites" / "sentiment"
+    suite_file_name: str = "test_suite_sentiment_amazon_reviews.pkl"
+    max_sequence_length: int = 75
+    model_path: PurePath = PROJECT_ROOT / "models" / "sentiment" / "bert_multilingual_amazon_reviews_hugging"
+    device: str = "cpu"
+    rebuild_test_suites: bool = True
+
+
+@dataclass
+class RunningParametersAirlineTweets:
+    run_tests_from_pkl: bool = False
+    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "airline_tweets" / "Tweets.csv"
+    label_file_path: PurePath = None
+    prediction_file_path: PurePath = PROJECT_ROOT / "predictions" / "sentiment" / "airline_tweets" / "bert.txt"
+    suite_save_root: PurePath = PROJECT_ROOT / "test_suites" / "sentiment"
+    suite_file_name: str = "test_suite_sentiment_airline_tweets.pkl"
 
 
 if __name__ == "__main__":
     # Arguments
     args = _parse_args()
-    suite_name = args.suite_name
-    suite_type = "sentiment"
-    training_data_file_name, prediction_data_file_name = args.training_data_file, args.prediction_data_file
-    run_tests_from_pkl = args.run_from_built_pkl
-    suite_save_pkl_path = PROJECT_ROOT / "test_suites" / suite_type / f"test_suite_{suite_type}_{suite_name}.pkl"
+    data_selection = args.data_selection
 
-    if not run_tests_from_pkl:
-        # Data pre-processing
-        data = load_data(PROJECT_ROOT / "data" / suite_type / suite_name / training_data_file_name)
+    # Running Parameters
+    if data_selection == "airline_tweets":
+        pars = RunningParametersAirlineTweets()
+    elif data_selection == "amazon_reviews":
+        pars = RunningParametersAmazonReviews()
+    else:
+        print("Please select from: \"airline_tweets\" or \"amazon_reviews\"")
+        pars = None
+    pars.device = get_device()
+
+    # Check for errors in parameters
+    if ".pkl" not in str(pars.suite_file_name):
+        raise ValueError("suite_save_pkl_path must contain .pkl file extension")
+    if ".txt" not in str(pars.prediction_file_path):
+        raise ValueError("prediction_file_path must contain a .txt file extension")
+
+    if isinstance(pars, RunningParametersAirlineTweets):
+        data = load_airline_tweets_data(pars.data_file_path)
         labels, confs, airlines, sentences, reasons = data  # unpack
         # parsed_data = parse_data(sentences)  # TODO determine if this is required
         parsed_data = sentences
+    elif isinstance(pars, RunningParametersAmazonReviews):
+        sentences, labels, labels_torch = load_amazon_review_data(data_path=pars.data_file_path,
+                                                                  label_path=pars.label_file_path)
+    else:
+        raise ValueError(f"Parameters of type {type(pars)} not of correct type.")
 
-        # Create a TestSuite
-        print("Creating TestSuite")
-        suite = TestSuite()
 
+
+    """
+    In order to guide test ideation, it's useful to think of CheckList as a matrix of Capabilities x Test Types.  
+    *Capabilities* refers to general-purpose linguistic capabilities, which manifest in one way or another in almost any NLP application.   
+    We suggest that anyone CheckListing a model go through *at least* the following capabilities, trying to create MFTs, INVs, and DIRs for each if possible.
+    1. **Vocabulary + POS:** important words or groups of words (by part-of-speech) for the task
+    2. **Taxonomy**: synonyms, antonyms, word categories, etc
+    3. **Robustness**: to typos, irrelevant additions, contractions, etc
+    4. **Named Entity Recognition (NER)**: person names, locations, numbers, etc
+    5. **Fairness**
+    6. **Temporal understanding**: understanding order of events and how they impact the task
+    7. **Negation**
+    8. **Coreference** 
+    9. **Semantic Role Labeling (SRL)**: understanding roles such as agent, object, passive/active, etc
+    10. **Logic**: symmetry, consistency, conjunctions, disjunctions, etc
+    """
+    # Build test suites
+    json_file_path = pars.suite_save_root / "test_suite_paths.json"
+    if pars.rebuild_test_suites:
         # Create an Editor
         print("Loading Editor")
         editor = Editor()
-        editor, lexicon = load_editor(editor, suite_name=suite_name)
-
-        """
-        In order to guide test ideation, it's useful to think of CheckList as a matrix of Capabilities x Test Types.  
-        *Capabilities* refers to general-purpose linguistic capabilities, which manifest in one way or another in almost any NLP application.   
-        We suggest that anyone CheckListing a model go through *at least* the following capabilities, trying to create MFTs, INVs, and DIRs for each if possible.
-        1. **Vocabulary + POS:** important words or groups of words (by part-of-speech) for the task
-        2. **Taxonomy**: synonyms, antonyms, word categories, etc
-        3. **Robustness**: to typos, irrelevant additions, contractions, etc
-        4. **Named Entity Recognition (NER)**: person names, locations, numbers, etc
-        5. **Fairness**
-        6. **Temporal understanding**: understanding order of events and how they impact the task
-        7. **Negation**
-        8. **Coreference** 
-        9. **Semantic Role Labeling (SRL)**: understanding roles such as agent, object, passive/active, etc
-        10. **Logic**: symmetry, consistency, conjunctions, disjunctions, etc
-        """
+        editor, lexicon = load_editor(editor, suite_name=pars.suite_file_name)
 
         print("Creating Tests")
+        test_suites = {}
+        test_suite_paths = {}
+
+        # TODO finish this test
         # Test type: Minimum Functionality Test (MFT) - used to verify the model has specific capabilities.
         # Capability: Can the model handle negation?
-        suite = create_mft_test_negation(suite, sentences, lexicon)
+        # suite = create_mft_test_negation(suite, sentences, lexicon)
 
         # Test type: Invariance - Invariance test (INV) is when we apply label-preserving perturbations to inputs and
         #                         expect the model prediction to remain the same.
         # Capability: Vocabulary (neutral words changed)
-        suite = create_invariance_test_change_neutral_words(suite, sentences, lexicon)
+        test_name_invariance_neutral_words = "invariance_neutral_words"
+        suite = create_invariance_test_change_neutral_words(TestSuite(), sentences, lexicon)
 
-        # Save the suite
-        print("Building suite")
-        save_build_suite(suite, save_to_pkl_path=suite_save_pkl_path,
-                         samples=500)
+        # Add all the tests into a suite of tests
+        path_of_files = pars.suite_save_root / test_name_invariance_neutral_words
+        test_suite_paths[test_name_invariance_neutral_words] = str(path_of_files)
+        test_suites[test_name_invariance_neutral_words] = suite
+
+        for test_name, suite in test_suites.items():
+            path_of_files = pars.suite_save_root / test_name
+            save_build_suite(suite, save_path=path_of_files,
+                             file_name="test.pkl", samples=500)
+
+        # Save all the test_suite location data to a json, used if we skip rebuilding
+        json_data = json.dumps(test_suite_paths)
+        with open(json_file_path, 'w') as f:
+            f.write(json_data)
+
+    # Re-Load the test suite data
+    with open(json_file_path, 'r') as f:
+        test_suite_dict = json.load(f)
+
+    # Generate a prediction file for each test
+    for test_name, path_to_test_suite in test_suite_dict.items():
+        # Create a dataloader (NOTE: We're passing the data into the labels as well, because these are not used) to
+        # make predictions
+        path_to_test_suite = Path(path_to_test_suite)
+        data_path = path_to_test_suite / "data.pt"
+        dataloader = get_data_loader(data_path=data_path, label_path=data_path,
+                                     shuffle=False, max_sequence_length=pars.max_sequence_length)
+
+        # Run the new examples through the model
+        model = load_model(model_path=str(pars.model_path), device=pars.device)
+        prediction_lines = create_predictions(model, data_loader=dataloader)
+        save_predictions(prediction_lines, path_to_test_suite, file_name="predictions.txt")
+        save_metadata(pars.model_path, path_to_test_suite, data_path, pars.max_sequence_length)
 
     # Run the analysis
-    print("Running analysis")
-    run_analysis(suite_path=suite_save_pkl_path,
-                 pred_path=str(PROJECT_ROOT / "predictions" / suite_type / suite_name / prediction_data_file_name))
+    for test_name, path_to_test_suite in test_suite_dict.items():
+        path_to_test_suite = Path(path_to_test_suite)
+        prediction_path = path_to_test_suite / "predictions.txt"
+        test_suite_path = path_to_test_suite / "test.pkl"
+        run_analysis(suite_path=test_suite_path, pred_path=prediction_path)
 
     print("Closing program")
