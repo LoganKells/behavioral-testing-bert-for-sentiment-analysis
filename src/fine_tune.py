@@ -12,7 +12,7 @@ from transformers import AdamW
 from transformers import get_scheduler
 from datasets import load_metric
 from tqdm.auto import tqdm
-from data import AmazonReviewDataSet
+from utils_amazon_reviews import AmazonReviewDataSet
 
 PROJECT_ROOT = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BERT_MODEL_PATH = 'nlptown/bert-base-multilingual-uncased-sentiment'
@@ -97,8 +97,8 @@ class TrainingParameters:
     device: str = "cpu"
     max_sequence_length: int = 75
     model_save_path: PurePath = PROJECT_ROOT / "models" / "sentiment" / "bert_multilingual_amazon_reviews_hugging"
-    data_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "data.pt"
-    label_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "labels.pt"
+    data_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "data_encoded.pt"
+    label_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "data_labels.pt"
 
 
 def save_training_parameters(file_path: Union[str, PurePath], parameters: TrainingParameters) -> None:
