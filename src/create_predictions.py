@@ -6,7 +6,7 @@ from typing import Union, List
 import torch
 from torch.utils.data import DataLoader
 from transformers import AutoModelForSequenceClassification
-from data import get_data_loader
+from utils_amazon_reviews import get_data_loader
 from fine_tune import get_device
 
 PROJECT_ROOT = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -101,9 +101,9 @@ class RunningParameters:
     device: str = "cpu"
     batch_size: int = 1
     max_sequence_length: int = 75
-    model_selection: tuple = (1,)  # Tuple selection related to get_model_selection(selection)
-    data_path = str(PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data.pt")
-    label_path = str(PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_labels.pt")
+    model_selection: tuple = (1, 2)  # Tuple selection related to get_model_selection(selection)
+    data_path = str(PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_encoded.pt")
+    label_path = str(PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_labels.pt")
 
 
 def get_model_selection(selection: int) -> dict:
@@ -119,6 +119,16 @@ def get_model_selection(selection: int) -> dict:
     return options[str(selection)]
 
 
+def load_model(model_path: str, device):
+    if ".pt" in model_path:
+        model = torch.load(model_path, map_location=device)
+    else:
+        model = AutoModelForSequenceClassification.from_pretrained(model_path)
+    model = model.to(device)
+    model = model.eval()
+    return model
+
+
 if __name__ == '__main__':
     # Parameters for running
     pars = RunningParameters
@@ -130,12 +140,7 @@ if __name__ == '__main__':
         model_metadata = get_model_selection(selection=selection)
         model_path, prediction_path = model_metadata["model_path"], model_metadata["prediction_path"]
         model_short_name = model_metadata["model_short_name"]
-        if ".pt" in model_path:
-            model = torch.load(model_path, map_location=pars.device)
-        else:
-            model = AutoModelForSequenceClassification.from_pretrained(model_path)
-        model = model.to(pars.device)
-        model = model.eval()
+        model = load_model(model_path, pars.device)
 
         # Get the data to use with the model
         data_loader = get_data_loader(pars.data_path, pars.label_path,
