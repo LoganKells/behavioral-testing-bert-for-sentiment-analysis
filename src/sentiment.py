@@ -156,6 +156,95 @@ def create_invariance_test_change_neutral_words(suite: TestSuite, sentences: Lis
 
     return suite
 
+def create_directional_expression_test_add_positive_phrases(suite: TestSuite, sentences: List[str], editor: Editor) -> TestSuite:
+    """
+    This function will add an Invariance test to the TestSuite where neutral words are randomly replaced.
+    DIRectional Expression Test: add strongly positive phrases to end of sentence
+    See https://github.com/marcotcr/checklist/blob/master/notebooks/Sentiment.ipynb
+    :param suite: TestSuite to add the test to.
+    :param sentences: Training data sentences.
+    :param lexicon: Lexicon defined for the dataset.
+    :return: TestSuite with the new test added.
+    """
+    positive = editor.template('I {pos_verb_present} this game.').data
+    positive += editor.template('The game is {pos_adj}.').data
+    positive += ['I want to play this game over and over again.']
+
+    def diff_up(orig_pred, pred, orig_conf, conf, labels=None, meta=None):
+        tolerance = 0.1
+        change = positive_change(orig_conf, conf)
+        if change + tolerance >= 0:
+            return True
+        else:
+            return change + tolerance
+
+    goes_up = Expect.pairwise(diff_up)
+    t = Perturb.perturb(parsed_data, add_phrase_function(positive), nsamples=500)
+    test = DIR(t.data, goes_up)
+    description = 'Add very positive phrases (e.g. I love this game) to the end of sentences, expect probability of positive to NOT go down (tolerance=0.1)'
+    suite.add(test, 'add positive phrases', 'Vocabulary', description)
+
+    return suite
+    
+
+def create_directional_expression_test_add_negative_phrases(suite: TestSuite, sentences: List[str], editor: Editor) -> TestSuite:
+    """
+    This function will add an Invariance test to the TestSuite where neutral words are randomly replaced.
+    DIRectional Expression Test: add strongly negative phrases to end of sentence
+    See https://github.com/marcotcr/checklist/blob/master/notebooks/Sentiment.ipynb
+    :param suite: TestSuite to add the test to.
+    :param sentences: Training data sentences.
+    :param lexicon: Lexicon defined for the dataset.
+    :return: TestSuite with the new test added.
+    """
+    negative = editor.template('I {neg_verb_present} this game.').data
+    negative += editor.template('The game is {neg_adj}.').data
+    negative += ['I would never play this game again.']
+
+    def diff_down(orig_pred, pred, orig_conf, conf, labels=None, meta=None):
+        tolerance = 0.1
+        change = positive_change(orig_conf, conf)
+        if change - tolerance <= 0:
+            return True
+        else:
+            return -(change - tolerance)
+
+    goes_down = Expect.pairwise(diff_down)
+    t = Perturb.perturb(parsed_data, add_phrase_function(negative), nsamples=500)
+    test = DIR(t.data, goes_down)
+    description = 'Add very negative phrases (e.g. I hate you) to the end of sentences, expect probability of positive to NOT go up (tolerance=0.1)'
+    suite.add(test, 'add negative phrases', 'Vocabulary', description)
+
+    return suite
+
+
+def add_phrase_function(phrases):
+    """
+    This funciton will add phrases to original
+    examples to creates transformed versions
+    """
+    def pert(d):
+        while d[-1].pos_ == 'PUNCT':
+            d = d[:-1]
+        d = d.text
+        ret = [d + '. ' + x for x in phrases]
+        idx = np.random.choice(len(ret), 10, replace=False)
+        ret = [ret[i] for i in idx]
+        return ret
+    return pert
+
+def positive_change(orig_conf, conf):
+    """
+    This funciton will measure the overall positive change 
+    in in an example that is transformed to have a strong positive
+    or negative phrase added to the end of a sentence. This metric
+    measures the net change in logit values on both ends of the spectrum
+    by comparing the transofmred and non-transformed sentence.
+    """
+    softmax = type(orig_conf) in [np.array, np.ndarray]
+    if not softmax or orig_conf.shape[0] != 5:
+        raise(Exception('Need prediction function to be softmax with 3 labels (negative, neutral, positive)'))
+    return orig_conf[0] - conf[0] + conf[4] - orig_conf[4]
 
 def save_build_suite(suite: TestSuite, save_path: Union[str, PurePath],
                      file_name: str, samples: int) -> None:
@@ -311,6 +400,15 @@ if __name__ == "__main__":
         # Capability: Vocabulary (neutral words changed)
         test_name_invariance_neutral_words = "invariance_neutral_words"
         suite = create_invariance_test_change_neutral_words(TestSuite(), sentences, lexicon)
+
+        # Add positive phrases: TODO -> verify this test works
+        test_name_positive_phrases = "directional_positive_phrases"
+        pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences, editor)
+
+
+        # Add negative phrases: TODO -> verify this test works
+        test_name_negative_phrases = "directional_negative_phrases"
+        neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences, editor)
 
         # Add all the tests into a suite of tests
         path_of_files = pars.suite_save_root / test_name_invariance_neutral_words
