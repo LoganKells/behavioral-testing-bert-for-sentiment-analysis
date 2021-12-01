@@ -158,8 +158,7 @@ def create_invariance_test_change_neutral_words(suite: TestSuite, sentences: Lis
 
 def create_directional_expression_test_add_positive_phrases(suite: TestSuite, sentences: List[str], editor: Editor) -> TestSuite:
     """
-    This function will add an Invariance test to the TestSuite where neutral words are randomly replaced.
-    DIRectional Expression Test: add strongly positive phrases to end of sentence
+    This function will add a DIRectional Expression Test: add strongly positive phrases to end of sentence
     See https://github.com/marcotcr/checklist/blob/master/notebooks/Sentiment.ipynb
     :param suite: TestSuite to add the test to.
     :param sentences: Training data sentences.
@@ -179,7 +178,7 @@ def create_directional_expression_test_add_positive_phrases(suite: TestSuite, se
             return change + tolerance
 
     goes_up = Expect.pairwise(diff_up)
-    t = Perturb.perturb(parsed_data, add_phrase_function(positive), nsamples=500)
+    t = Perturb.perturb(sentences, add_phrase_function(positive), nsamples=500)
     test = DIR(t.data, goes_up)
     description = 'Add very positive phrases (e.g. I love this game) to the end of sentences, expect probability of positive to NOT go down (tolerance=0.1)'
     suite.add(test, 'add positive phrases', 'Vocabulary', description)
@@ -189,8 +188,7 @@ def create_directional_expression_test_add_positive_phrases(suite: TestSuite, se
 
 def create_directional_expression_test_add_negative_phrases(suite: TestSuite, sentences: List[str], editor: Editor) -> TestSuite:
     """
-    This function will add an Invariance test to the TestSuite where neutral words are randomly replaced.
-    DIRectional Expression Test: add strongly negative phrases to end of sentence
+    This function will add DIRectional Expression Test: add strongly negative phrases to end of sentence
     See https://github.com/marcotcr/checklist/blob/master/notebooks/Sentiment.ipynb
     :param suite: TestSuite to add the test to.
     :param sentences: Training data sentences.
@@ -210,7 +208,7 @@ def create_directional_expression_test_add_negative_phrases(suite: TestSuite, se
             return -(change - tolerance)
 
     goes_down = Expect.pairwise(diff_down)
-    t = Perturb.perturb(parsed_data, add_phrase_function(negative), nsamples=500)
+    t = Perturb.perturb(sentences, add_phrase_function(negative), nsamples=500)
     test = DIR(t.data, goes_down)
     description = 'Add very negative phrases (e.g. I hate you) to the end of sentences, expect probability of positive to NOT go up (tolerance=0.1)'
     suite.add(test, 'add negative phrases', 'Vocabulary', description)
@@ -233,6 +231,7 @@ def add_phrase_function(phrases):
         return ret
     return pert
 
+
 def positive_change(orig_conf, conf):
     """
     This funciton will measure the overall positive change 
@@ -245,6 +244,7 @@ def positive_change(orig_conf, conf):
     if not softmax or orig_conf.shape[0] != 5:
         raise(Exception('Need prediction function to be softmax with 3 labels (negative, neutral, positive)'))
     return orig_conf[0] - conf[0] + conf[4] - orig_conf[4]
+
 
 def save_build_suite(suite: TestSuite, save_path: Union[str, PurePath],
                      file_name: str, samples: int) -> None:
@@ -308,7 +308,7 @@ def _parse_args() -> argparse.Namespace:
 @dataclass
 class RunningParametersAmazonReviews:
     run_tests_from_pkl: bool = False
-    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_100exs.csv"
+    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_1exs.csv"
     label_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_labels.pt"
     prediction_file_path: PurePath = PROJECT_ROOT / "predictions" / "sentiment" / "amazon_reviews" / "bert_trained" / "bert_multilingual.txt"
     suite_save_root: PurePath = PROJECT_ROOT / "test_suites" / "sentiment"
@@ -361,8 +361,6 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Parameters of type {type(pars)} not of correct type.")
 
-
-
     """
     In order to guide test ideation, it's useful to think of CheckList as a matrix of Capabilities x Test Types.  
     *Capabilities* refers to general-purpose linguistic capabilities, which manifest in one way or another in almost any NLP application.   
@@ -390,31 +388,43 @@ if __name__ == "__main__":
         test_suites = {}
         test_suite_paths = {}
 
-        # TODO finish this test
-        # Test type: Minimum Functionality Test (MFT) - used to verify the model has specific capabilities.
-        # Capability: Can the model handle negation?
-        # suite = create_mft_test_negation(suite, sentences, lexicon)
+        skip_build_override = True
+        if not skip_build_override:
+            # Test type: Invariance - Invariance test (INV) is when we apply label-preserving perturbations to inputs and
+            #                         expect the model prediction to remain the same.
+            # Capability: Vocabulary (neutral words changed)
+            test_name_invariance_neutral_words = "invariance_neutral_words"
+            inv_neutral_suite = create_invariance_test_change_neutral_words(TestSuite(), sentences, lexicon)
+            # Add paths
+            path_of_files = pars.suite_save_root / test_name_invariance_neutral_words
+            test_suite_paths[test_name_invariance_neutral_words] = str(path_of_files)
+            # Add suite
+            test_suites[test_name_invariance_neutral_words] = inv_neutral_suite
+        else:
+            # Add positive phrases: TODO -> verify this test works
+            test_name_positive_phrases = "directional_positive_phrases"
+            pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences, editor)
+            # Add paths
+            path_of_files = pars.suite_save_root / test_name_positive_phrases
+            test_suite_paths[test_name_positive_phrases] = str(path_of_files)
+            # Add suite
+            test_suites[test_name_positive_phrases] = pos_suite
 
-        # Test type: Invariance - Invariance test (INV) is when we apply label-preserving perturbations to inputs and
-        #                         expect the model prediction to remain the same.
-        # Capability: Vocabulary (neutral words changed)
-        test_name_invariance_neutral_words = "invariance_neutral_words"
-        suite = create_invariance_test_change_neutral_words(TestSuite(), sentences, lexicon)
+            # Add negative phrases: TODO -> verify this test works
+            test_name_negative_phrases = "directional_negative_phrases"
+            neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences, editor)
+            # Add paths
+            path_of_files = pars.suite_save_root / test_name_negative_phrases
+            test_suite_paths[test_name_negative_phrases] = str(path_of_files)
+            # Add suite
+            test_suites[test_name_negative_phrases] = neg_suite
 
-        # Add positive phrases: TODO -> verify this test works
-        test_name_positive_phrases = "directional_positive_phrases"
-        pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences, editor)
+            # TODO finish this test
+            # Test type: Minimum Functionality Test (MFT) - used to verify the model has specific capabilities.
+            # Capability: Can the model handle negation?
+            # suite = create_mft_test_negation(suite, sentences, lexicon)
 
-
-        # Add negative phrases: TODO -> verify this test works
-        test_name_negative_phrases = "directional_negative_phrases"
-        neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences, editor)
-
-        # Add all the tests into a suite of tests
-        path_of_files = pars.suite_save_root / test_name_invariance_neutral_words
-        test_suite_paths[test_name_invariance_neutral_words] = str(path_of_files)
-        test_suites[test_name_invariance_neutral_words] = suite
-
+        # Save and build any suites added to the dictionary.
         for test_name, suite in test_suites.items():
             path_of_files = pars.suite_save_root / test_name
             save_build_suite(suite, save_path=path_of_files,
