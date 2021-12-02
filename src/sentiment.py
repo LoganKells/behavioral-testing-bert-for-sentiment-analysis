@@ -156,7 +156,9 @@ def create_invariance_test_change_neutral_words(suite: TestSuite, sentences: Lis
 
     return suite
 
-def create_directional_expression_test_add_positive_phrases(suite: TestSuite, sentences: List[str], editor: Editor) -> TestSuite:
+
+def create_directional_expression_test_add_positive_phrases(suite: TestSuite, sentences: List[str],
+                                                            editor: Editor) -> TestSuite:
     """
     This function will add a DIRectional Expression Test: add strongly positive phrases to end of sentence
     See https://github.com/marcotcr/checklist/blob/master/notebooks/Sentiment.ipynb
@@ -180,13 +182,15 @@ def create_directional_expression_test_add_positive_phrases(suite: TestSuite, se
     goes_up = Expect.pairwise(diff_up)
     t = Perturb.perturb(sentences, add_phrase_function(positive), nsamples=500)
     test = DIR(t.data, goes_up)
-    description = 'Add very positive phrases (e.g. I love this game) to the end of sentences, expect probability of positive to NOT go down (tolerance=0.1)'
-    suite.add(test, 'add positive phrases', 'Vocabulary', description)
+    description = 'Add very positive phrases (e.g. I love this game) to the end of sentences, ' \
+                  'expect probability of positive to NOT go down (tolerance=0.1)'
+    suite.add(test, name='add positive phrases', capability='Vocabulary', description=description)
 
     return suite
-    
 
-def create_directional_expression_test_add_negative_phrases(suite: TestSuite, sentences: List[str], editor: Editor) -> TestSuite:
+
+def create_directional_expression_test_add_negative_phrases(suite: TestSuite, sentences: List[str],
+                                                            editor: Editor) -> TestSuite:
     """
     This function will add DIRectional Expression Test: add strongly negative phrases to end of sentence
     See https://github.com/marcotcr/checklist/blob/master/notebooks/Sentiment.ipynb
@@ -210,8 +214,9 @@ def create_directional_expression_test_add_negative_phrases(suite: TestSuite, se
     goes_down = Expect.pairwise(diff_down)
     t = Perturb.perturb(sentences, add_phrase_function(negative), nsamples=500)
     test = DIR(t.data, goes_down)
-    description = 'Add very negative phrases (e.g. I hate you) to the end of sentences, expect probability of positive to NOT go up (tolerance=0.1)'
-    suite.add(test, 'add negative phrases', 'Vocabulary', description)
+    description = 'Add very negative phrases (e.g. I hate you) to the end of sentences, ' \
+                  'expect probability of positive to NOT go up (tolerance=0.1)'
+    suite.add(test, name='add negative phrases', capability='Vocabulary', description=description)
 
     return suite
 
@@ -221,6 +226,7 @@ def add_phrase_function(phrases):
     This funciton will add phrases to original
     examples to creates transformed versions
     """
+
     def pert(d):
         while d[-1].pos_ == 'PUNCT':
             d = d[:-1]
@@ -229,6 +235,7 @@ def add_phrase_function(phrases):
         idx = np.random.choice(len(ret), 10, replace=False)
         ret = [ret[i] for i in idx]
         return ret
+
     return pert
 
 
@@ -242,7 +249,7 @@ def positive_change(orig_conf, conf):
     """
     softmax = type(orig_conf) in [np.array, np.ndarray]
     if not softmax or orig_conf.shape[0] != 5:
-        raise(Exception('Need prediction function to be softmax with 3 labels (negative, neutral, positive)'))
+        raise (Exception('Need prediction function to be softmax with 3 labels (negative, neutral, positive)'))
     return orig_conf[0] - conf[0] + conf[4] - orig_conf[4]
 
 
@@ -295,6 +302,113 @@ def run_analysis(suite_path: Union[str, PurePath], pred_path: Union[str, PurePat
     suite.summary()
 
 
+def create_suite_file_paths(root_path: PurePath, keys: List[str]) -> dict:
+    """
+    This function will build a dictionary of PurePath to the test suites
+    :return: dictionary of paths, keys are suite names matching the file folder.
+    """
+    test_suite_paths = {}
+    for name in keys:
+        test_suite_paths[name] = root_path / name
+    return test_suite_paths
+
+
+def build_suites(sentences, lexicon, editor, save_path: PurePath, test_suite_names: List[str]) -> tuple:
+    """
+    If this function is run, it will create and build all the suites it contains
+
+    In order to guide test ideation, it's useful to think of CheckList as a matrix of Capabilities x Test Types.
+    *Capabilities* refers to general-purpose linguistic capabilities, which manifest in one way or another in almost any NLP application.
+    We suggest that anyone CheckListing a model go through *at least* the following capabilities, trying to create MFTs, INVs, and DIRs for each if possible.
+    1. **Vocabulary + POS:** important words or groups of words (by part-of-speech) for the task
+    2. **Taxonomy**: synonyms, antonyms, word categories, etc
+    3. **Robustness**: to typos, irrelevant additions, contractions, etc
+    4. **Named Entity Recognition (NER)**: person names, locations, numbers, etc
+    5. **Fairness**
+    6. **Temporal understanding**: understanding order of events and how they impact the task
+    7. **Negation**
+    8. **Coreference**
+    9. **Semantic Role Labeling (SRL)**: understanding roles such as agent, object, passive/active, etc
+    10. **Logic**: symmetry, consistency, conjunctions, disjunctions, etc
+    :param sentences: List of sentence examples
+    :param lexicon: lexicon loaded to the Editor()
+    :param editor: Editor() that is loaded with lexicon
+    :param test_suite_names: List[str] of all the test suite names.
+    :return: tuple of (dict of TestSuites, dict of paths to test suite folders)
+    """
+    tests = {}
+
+    ### TEST 1 ###
+    # Test type: Invariance - Invariance test (INV) is when we apply label-preserving perturbations to inputs and
+    #                         expect the model prediction to remain the same.
+    # Capability: Vocabulary (neutral words changed)
+    test_name_invariance_neutral_words = "invariance_neutral_words"
+    print(f"Creating test: {test_name_invariance_neutral_words}")
+    inv_neutral_suite = create_invariance_test_change_neutral_words(TestSuite(), sentences, lexicon)
+    tests[test_name_invariance_neutral_words] = inv_neutral_suite
+
+    ### TEST 2 ###
+    test_name_positive_phrases = "directional_positive_phrases"
+    print(f"Creating test {test_name_positive_phrases}")
+    sentences_nlp_pipe = parse_data(sentences)  # Create nlp pipeline
+    pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences_nlp_pipe, editor)
+    tests[test_name_positive_phrases] = pos_suite
+
+    ### TEST 3 ###
+    test_name_negative_phrases = "directional_negative_phrases"
+    print(f"Creating test: {test_name_negative_phrases}")
+    neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences, editor)
+    tests[test_name_negative_phrases] = neg_suite
+
+    ### Test 4 ###
+    # TODO finish this test
+    # Test type: Minimum Functionality Test (MFT) - used to verify the model has specific capabilities.
+    # Capability: Can the model handle negation?
+    # suite = create_mft_test_negation(suite, sentences, lexicon)
+
+    # Save and build any suites added to the dictionary.
+    for test_name, suite in tests.items():
+        save_build_suite(suite, save_path=save_path / test_name,
+                         file_name="test.pkl", samples=100)
+
+    # Define all the save paths
+    paths = create_suite_file_paths(root_path=save_path, keys=test_suite_names)
+
+    return tests, paths
+
+
+def run_all_test_suites(json_file_path: PurePath, paths: dict) -> None:
+    """
+    This function will run all the test suites saved within the test_paths dict.
+    :param json_file_path:
+    :param paths: dictionary of folder paths for each test suite.
+    :return: None
+    """
+
+    # Generate a prediction file for each test
+    for test_name, path_to_test_suite in paths.items():
+        print(f'Running test: {test_name}')
+        # Create a dataloader (NOTE: We're passing the data into the labels as well, because these are not used) to
+        # make predictions
+        path_to_test_suite = Path(path_to_test_suite)
+        data_path = path_to_test_suite / "data.pt"
+        dataloader = get_data_loader(data_path=data_path, label_path=data_path,
+                                     shuffle=False, max_sequence_length=pars.max_sequence_length)
+
+        # Run the new examples through the model
+        model = load_model(model_path=str(pars.model_path), device=pars.device)
+        prediction_lines = create_predictions(model, data_loader=dataloader)
+        save_predictions(prediction_lines, path_to_test_suite, file_name="predictions.txt")
+        save_metadata(pars.model_path, path_to_test_suite, data_path, pars.max_sequence_length)
+
+    # Run the analysis
+    for test_name, path_to_test_suite in paths.items():
+        path_to_test_suite = Path(path_to_test_suite)
+        prediction_path = path_to_test_suite / "predictions.txt"
+        test_suite_path = path_to_test_suite / "test.pkl"
+        run_analysis(suite_path=test_suite_path, pred_path=prediction_path)
+
+
 def _parse_args() -> argparse.Namespace:
     # Argument parsing
     parser = argparse.ArgumentParser(
@@ -316,7 +430,7 @@ class RunningParametersAmazonReviews:
     max_sequence_length: int = 75
     model_path: PurePath = PROJECT_ROOT / "models" / "sentiment" / "bert_multilingual_amazon_reviews_hugging"
     device: str = "cpu"
-    rebuild_test_suites: bool = True
+    rebuild_test_suites: bool = False
 
 
 @dataclass
@@ -361,112 +475,25 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Parameters of type {type(pars)} not of correct type.")
 
-    """
-    In order to guide test ideation, it's useful to think of CheckList as a matrix of Capabilities x Test Types.  
-    *Capabilities* refers to general-purpose linguistic capabilities, which manifest in one way or another in almost any NLP application.   
-    We suggest that anyone CheckListing a model go through *at least* the following capabilities, trying to create MFTs, INVs, and DIRs for each if possible.
-    1. **Vocabulary + POS:** important words or groups of words (by part-of-speech) for the task
-    2. **Taxonomy**: synonyms, antonyms, word categories, etc
-    3. **Robustness**: to typos, irrelevant additions, contractions, etc
-    4. **Named Entity Recognition (NER)**: person names, locations, numbers, etc
-    5. **Fairness**
-    6. **Temporal understanding**: understanding order of events and how they impact the task
-    7. **Negation**
-    8. **Coreference** 
-    9. **Semantic Role Labeling (SRL)**: understanding roles such as agent, object, passive/active, etc
-    10. **Logic**: symmetry, consistency, conjunctions, disjunctions, etc
-    """
     # Build test suites
-    json_file_path = pars.suite_save_root / "test_suite_paths.json"
+    # test_names = ["invariance_neutral_words", "directional_positive_phrases", "directional_negative_phrases"]
+    test_names = ["directional_negative_phrases"]
     if pars.rebuild_test_suites:
         # Create an Editor
         print("Loading Editor")
         editor = Editor()
         editor, lexicon = load_editor(editor, suite_name=pars.suite_file_name)
 
-        print("Creating Tests")
-        test_suites = {}
-        test_suite_paths = {}
+        # Rebuild the test suites
+        print("Rebuilding test suites...")
+        test_suites, _test_suite_paths = build_suites(sentences, lexicon, editor, save_path=pars.suite_save_root,
+                                                     test_suite_names=test_names)
+    else:
+        # Create a dictionary of paths to the test suites
+        _test_suite_paths = create_suite_file_paths(root_path=pars.suite_save_root, keys=test_names)
 
-        skip_build_override = True
-        save_data = True
-
-        if not skip_build_override:
-            # Test type: Invariance - Invariance test (INV) is when we apply label-preserving perturbations to inputs and
-            #                         expect the model prediction to remain the same.
-            # Capability: Vocabulary (neutral words changed)
-            test_name_invariance_neutral_words = "invariance_neutral_words"
-            inv_neutral_suite = create_invariance_test_change_neutral_words(TestSuite(), sentences, lexicon)
-            # Add paths
-            path_of_files = pars.suite_save_root / test_name_invariance_neutral_words
-            test_suite_paths[test_name_invariance_neutral_words] = str(path_of_files)
-            # Add suite
-            test_suites[test_name_invariance_neutral_words] = inv_neutral_suite
-        else:
-            pass
-            # sentences = parse_data(sentences)
-            # # Add positive phrases: TODO -> verify this test works
-            # test_name_positive_phrases = "directional_positive_phrases"
-            # pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences, editor)
-            # # Add paths
-            # path_of_files = pars.suite_save_root / test_name_positive_phrases
-            # test_suite_paths[test_name_positive_phrases] = str(path_of_files)
-            # # Add suite
-            # test_suites[test_name_positive_phrases] = pos_suite
-
-            # # Add negative phrases: TODO -> verify this test works
-            # test_name_negative_phrases = "directional_negative_phrases"
-            # neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences, editor)
-            # # Add paths
-            # path_of_files = pars.suite_save_root / test_name_negative_phrases
-            # test_suite_paths[test_name_negative_phrases] = str(path_of_files)
-            # # Add suite
-            # test_suites[test_name_negative_phrases] = neg_suite
-
-            # TODO finish this test
-            # Test type: Minimum Functionality Test (MFT) - used to verify the model has specific capabilities.
-            # Capability: Can the model handle negation?
-            # suite = create_mft_test_negation(suite, sentences, lexicon)
-
-        # Save and build any suites added to the dictionary.
-        for test_name, suite in test_suites.items():
-            path_of_files = pars.suite_save_root / test_name
-            save_build_suite(suite, save_path=path_of_files,
-                             file_name="test.pkl", samples=100)
-
-        # Save all the test_suite location data to a json, used if we skip rebuilding
-        if save_data:
-            json_data = json.dumps(test_suite_paths)
-            with open(json_file_path, 'w') as f:
-                print('dumpign json')
-                f.write(json_data)
-    
-    # Re-Load the test suite data
-    with open(json_file_path, 'r') as f:
-        test_suite_dict = json.load(f)
-    
-
-    # Generate a prediction file for each test
-    for test_name, path_to_test_suite in test_suite_dict.items():
-        print('running test')
-        # Create a dataloader (NOTE: We're passing the data into the labels as well, because these are not used) to
-        # make predictions
-        path_to_test_suite = Path(path_to_test_suite)
-        data_path = path_to_test_suite / "data.pt"
-        dataloader = get_data_loader(data_path=data_path, label_path=data_path,
-                                     shuffle=False, max_sequence_length=pars.max_sequence_length)
-
-        # Run the new examples through the model
-        model = load_model(model_path=str(pars.model_path), device=pars.device)
-        prediction_lines = create_predictions(model, data_loader=dataloader)
-        save_predictions(prediction_lines, path_to_test_suite, file_name="predictions.txt")
-        save_metadata(pars.model_path, path_to_test_suite, data_path, pars.max_sequence_length)
-
-    # Run the analysis
-    for test_name, path_to_test_suite in test_suite_dict.items():
-        path_to_test_suite = Path(path_to_test_suite)
-        prediction_path = path_to_test_suite / "predictions.txt"
-        test_suite_path = path_to_test_suite / "test.pkl"
-        run_analysis(suite_path=test_suite_path, pred_path=prediction_path)
+    # Run the tests
+    print("Running all test suites")
+    run_all_test_suites(json_file_path=pars.suite_save_root / "test_suite_paths.json", paths=_test_suite_paths)
 
     print("Closing program")
