@@ -308,7 +308,7 @@ def _parse_args() -> argparse.Namespace:
 @dataclass
 class RunningParametersAmazonReviews:
     run_tests_from_pkl: bool = False
-    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_1exs.csv"
+    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_10exs.csv"
     label_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_labels.pt"
     prediction_file_path: PurePath = PROJECT_ROOT / "predictions" / "sentiment" / "amazon_reviews" / "bert_trained" / "bert_multilingual.txt"
     suite_save_root: PurePath = PROJECT_ROOT / "test_suites" / "sentiment"
@@ -389,6 +389,8 @@ if __name__ == "__main__":
         test_suite_paths = {}
 
         skip_build_override = True
+        save_data = True
+
         if not skip_build_override:
             # Test type: Invariance - Invariance test (INV) is when we apply label-preserving perturbations to inputs and
             #                         expect the model prediction to remain the same.
@@ -401,23 +403,25 @@ if __name__ == "__main__":
             # Add suite
             test_suites[test_name_invariance_neutral_words] = inv_neutral_suite
         else:
-            # Add positive phrases: TODO -> verify this test works
-            test_name_positive_phrases = "directional_positive_phrases"
-            pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences, editor)
-            # Add paths
-            path_of_files = pars.suite_save_root / test_name_positive_phrases
-            test_suite_paths[test_name_positive_phrases] = str(path_of_files)
-            # Add suite
-            test_suites[test_name_positive_phrases] = pos_suite
+            pass
+            # sentences = parse_data(sentences)
+            # # Add positive phrases: TODO -> verify this test works
+            # test_name_positive_phrases = "directional_positive_phrases"
+            # pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences, editor)
+            # # Add paths
+            # path_of_files = pars.suite_save_root / test_name_positive_phrases
+            # test_suite_paths[test_name_positive_phrases] = str(path_of_files)
+            # # Add suite
+            # test_suites[test_name_positive_phrases] = pos_suite
 
-            # Add negative phrases: TODO -> verify this test works
-            test_name_negative_phrases = "directional_negative_phrases"
-            neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences, editor)
-            # Add paths
-            path_of_files = pars.suite_save_root / test_name_negative_phrases
-            test_suite_paths[test_name_negative_phrases] = str(path_of_files)
-            # Add suite
-            test_suites[test_name_negative_phrases] = neg_suite
+            # # Add negative phrases: TODO -> verify this test works
+            # test_name_negative_phrases = "directional_negative_phrases"
+            # neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences, editor)
+            # # Add paths
+            # path_of_files = pars.suite_save_root / test_name_negative_phrases
+            # test_suite_paths[test_name_negative_phrases] = str(path_of_files)
+            # # Add suite
+            # test_suites[test_name_negative_phrases] = neg_suite
 
             # TODO finish this test
             # Test type: Minimum Functionality Test (MFT) - used to verify the model has specific capabilities.
@@ -431,16 +435,20 @@ if __name__ == "__main__":
                              file_name="test.pkl", samples=100)
 
         # Save all the test_suite location data to a json, used if we skip rebuilding
-        json_data = json.dumps(test_suite_paths)
-        with open(json_file_path, 'w') as f:
-            f.write(json_data)
-
+        if save_data:
+            json_data = json.dumps(test_suite_paths)
+            with open(json_file_path, 'w') as f:
+                print('dumpign json')
+                f.write(json_data)
+    
     # Re-Load the test suite data
     with open(json_file_path, 'r') as f:
         test_suite_dict = json.load(f)
+    
 
     # Generate a prediction file for each test
     for test_name, path_to_test_suite in test_suite_dict.items():
+        print('running test')
         # Create a dataloader (NOTE: We're passing the data into the labels as well, because these are not used) to
         # make predictions
         path_to_test_suite = Path(path_to_test_suite)
