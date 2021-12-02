@@ -171,6 +171,9 @@ def create_directional_expression_test_add_positive_phrases(suite: TestSuite, se
     positive += editor.template('The game is {pos_adj}.').data
     positive += ['I want to play this game over and over again.']
 
+    # Send the sentences through an NLP pipeline
+    sentences_nlp = parse_data(sentences)
+
     def diff_up(orig_pred, pred, orig_conf, conf, labels=None, meta=None):
         tolerance = 0.1
         change = positive_change(orig_conf, conf)
@@ -180,7 +183,7 @@ def create_directional_expression_test_add_positive_phrases(suite: TestSuite, se
             return change + tolerance
 
     goes_up = Expect.pairwise(diff_up)
-    t = Perturb.perturb(sentences, add_phrase_function(positive), nsamples=500)
+    t = Perturb.perturb(sentences_nlp, add_phrase_function(positive), nsamples=500)
     test = DIR(t.data, goes_up)
     description = 'Add very positive phrases (e.g. I love this game) to the end of sentences, ' \
                   'expect probability of positive to NOT go down (tolerance=0.1)'
@@ -199,6 +202,10 @@ def create_directional_expression_test_add_negative_phrases(suite: TestSuite, se
     :param lexicon: Lexicon defined for the dataset.
     :return: TestSuite with the new test added.
     """
+
+    # Send the sentences through an NLP pipeline
+    sentences_nlp = parse_data(sentences)
+
     negative = editor.template('I {neg_verb_present} this game.').data
     negative += editor.template('The game is {neg_adj}.').data
     negative += ['I would never play this game again.']
@@ -212,7 +219,7 @@ def create_directional_expression_test_add_negative_phrases(suite: TestSuite, se
             return -(change - tolerance)
 
     goes_down = Expect.pairwise(diff_down)
-    t = Perturb.perturb(sentences, add_phrase_function(negative), nsamples=500)
+    t = Perturb.perturb(sentences_nlp, add_phrase_function(negative), nsamples=500)
     test = DIR(t.data, goes_down)
     description = 'Add very negative phrases (e.g. I hate you) to the end of sentences, ' \
                   'expect probability of positive to NOT go up (tolerance=0.1)'
@@ -350,14 +357,14 @@ def build_suites(sentences, lexicon, editor, save_path: PurePath, test_suite_nam
     ### TEST 2 ###
     test_name_positive_phrases = "directional_positive_phrases"
     print(f"Creating test {test_name_positive_phrases}")
-    sentences_nlp_pipe = parse_data(sentences)  # Create nlp pipeline
-    pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences_nlp_pipe, editor)
+      # Create nlp pipeline
+    pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences, editor)
     tests[test_name_positive_phrases] = pos_suite
 
     ### TEST 3 ###
     test_name_negative_phrases = "directional_negative_phrases"
     print(f"Creating test: {test_name_negative_phrases}")
-    neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences, editor)
+    neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences_nlp_pipe, editor)
     tests[test_name_negative_phrases] = neg_suite
 
     ### Test 4 ###
@@ -377,10 +384,9 @@ def build_suites(sentences, lexicon, editor, save_path: PurePath, test_suite_nam
     return tests, paths
 
 
-def run_all_test_suites(json_file_path: PurePath, paths: dict) -> None:
+def run_all_test_suites(paths: dict) -> None:
     """
     This function will run all the test suites saved within the test_paths dict.
-    :param json_file_path:
     :param paths: dictionary of folder paths for each test suite.
     :return: None
     """
@@ -486,14 +492,14 @@ if __name__ == "__main__":
 
         # Rebuild the test suites
         print("Rebuilding test suites...")
-        test_suites, _test_suite_paths = build_suites(sentences, lexicon, editor, save_path=pars.suite_save_root,
+        test_suites, test_suite_paths = build_suites(sentences, lexicon, editor, save_path=pars.suite_save_root,
                                                      test_suite_names=test_names)
     else:
         # Create a dictionary of paths to the test suites
-        _test_suite_paths = create_suite_file_paths(root_path=pars.suite_save_root, keys=test_names)
+        test_suite_paths = create_suite_file_paths(root_path=pars.suite_save_root, keys=test_names)
 
     # Run the tests
     print("Running all test suites")
-    run_all_test_suites(json_file_path=pars.suite_save_root / "test_suite_paths.json", paths=_test_suite_paths)
+    run_all_test_suites(paths=test_suite_paths)
 
     print("Closing program")
