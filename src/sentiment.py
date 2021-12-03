@@ -89,8 +89,7 @@ def load_editor(editor: Editor, suite_name: str) -> Tuple[Editor, dict]:
 
 def parse_data(sentences: List[str]):
     nlp = spacy.load('en_core_web_sm')
-    parsed_data = list(nlp.pipe(sentences))
-    return parsed_data
+    return list(nlp.pipe(sentences))
 
 
 def create_mft_test_negation(suite: TestSuite, sentences: List[str], lexicon: dict) -> TestSuite:
@@ -114,13 +113,15 @@ def create_mft_test_negation(suite: TestSuite, sentences: List[str], lexicon: di
     raise NotImplementedError("Need to finish this function")
 
 
-def create_invariance_test_change_neutral_words(suite: TestSuite, sentences: List[str], lexicon: dict) -> TestSuite:
+def create_invariance_test_change_neutral_words(suite: TestSuite, sentences: List[str], lexicon: dict,
+                                                example_count: int) -> TestSuite:
     """
     This function will add an Invariance test to the TestSuite where neutral words are randomly replaced.
     INVariance: change neutral words. See https://github.com/marcotcr/checklist/blob/master/notebooks/Sentiment.ipynb
     :param suite: TestSuite to add the test to.
     :param sentences: Training data sentences.
     :param lexicon: Lexicon defined for the dataset.
+    :param example_count: Number of examples the test suite will create
     :return: TestSuite with the new test added.
     """
     forbidden = set(['No', 'no', 'Not', 'not', 'Nothing', 'nothing', 'without',
@@ -146,7 +147,7 @@ def create_invariance_test_change_neutral_words(suite: TestSuite, sentences: Lis
 
     # Perturb.perturb(parsed_data[:5], perturb)
 
-    t = Perturb.perturb(sentences, change_neutral, nsamples=500)
+    t = Perturb.perturb(sentences, change_neutral, nsamples=example_count)
     test = INV(t.data)
     description = 'Change a set of neutral words with other context-appropriate neutral words (using BERT).'
 
@@ -158,18 +159,22 @@ def create_invariance_test_change_neutral_words(suite: TestSuite, sentences: Lis
 
 
 def create_directional_expression_test_add_positive_phrases(suite: TestSuite, sentences: List[str],
-                                                            editor: Editor) -> TestSuite:
+                                                            editor: Editor, example_count: int) -> TestSuite:
     """
     This function will add a DIRectional Expression Test: add strongly positive phrases to end of sentence
     See https://github.com/marcotcr/checklist/blob/master/notebooks/Sentiment.ipynb
     :param suite: TestSuite to add the test to.
     :param sentences: Training data sentences.
     :param lexicon: Lexicon defined for the dataset.
+    :param example_count: The number of examples the test suite will create.
     :return: TestSuite with the new test added.
     """
     positive = editor.template('I {pos_verb_present} this game.').data
     positive += editor.template('The game is {pos_adj}.').data
+    positive += editor.template('This game is {pos_adj}.').data
+    positive += editor.template('This game was {pos_adj}.').data
     positive += ['I want to play this game over and over again.']
+    positive += ['I love this game.']
 
     # Send the sentences through an NLP pipeline
     sentences_nlp = parse_data(sentences)
@@ -183,7 +188,7 @@ def create_directional_expression_test_add_positive_phrases(suite: TestSuite, se
             return change + tolerance
 
     goes_up = Expect.pairwise(diff_up)
-    t = Perturb.perturb(sentences_nlp, add_phrase_function(positive), nsamples=500)
+    t = Perturb.perturb(sentences_nlp, add_phrase_function(positive), nsamples=example_count)
     test = DIR(t.data, goes_up)
     description = 'Add very positive phrases (e.g. I love this game) to the end of sentences, ' \
                   'expect probability of positive to NOT go down (tolerance=0.1)'
@@ -193,13 +198,14 @@ def create_directional_expression_test_add_positive_phrases(suite: TestSuite, se
 
 
 def create_directional_expression_test_add_negative_phrases(suite: TestSuite, sentences: List[str],
-                                                            editor: Editor) -> TestSuite:
+                                                            editor: Editor, example_count: int) -> TestSuite:
     """
     This function will add DIRectional Expression Test: add strongly negative phrases to end of sentence
     See https://github.com/marcotcr/checklist/blob/master/notebooks/Sentiment.ipynb
     :param suite: TestSuite to add the test to.
     :param sentences: Training data sentences.
     :param lexicon: Lexicon defined for the dataset.
+    :param example_count: The number of examples the test suite will create
     :return: TestSuite with the new test added.
     """
 
@@ -219,7 +225,7 @@ def create_directional_expression_test_add_negative_phrases(suite: TestSuite, se
             return -(change - tolerance)
 
     goes_down = Expect.pairwise(diff_down)
-    t = Perturb.perturb(sentences_nlp, add_phrase_function(negative), nsamples=500)
+    t = Perturb.perturb(sentences_nlp, add_phrase_function(negative), nsamples=example_count)
     test = DIR(t.data, goes_down)
     description = 'Add very negative phrases (e.g. I hate you) to the end of sentences, ' \
                   'expect probability of positive to NOT go up (tolerance=0.1)'
@@ -309,7 +315,7 @@ def run_analysis(suite_path: Union[str, PurePath], pred_path: Union[str, PurePat
     suite.summary()
 
 
-def create_suite_file_paths(root_path: PurePath, keys: List[str]) -> dict:
+def create_suite_file_paths(root_path: PurePath, keys: Tuple[str, ...]) -> dict:
     """
     This function will build a dictionary of PurePath to the test suites
     :return: dictionary of paths, keys are suite names matching the file folder.
@@ -320,7 +326,7 @@ def create_suite_file_paths(root_path: PurePath, keys: List[str]) -> dict:
     return test_suite_paths
 
 
-def build_suites(sentences, lexicon, editor, save_path: PurePath, test_suite_names: List[str]) -> tuple:
+def build_suites(sentences, lexicon, editor, save_path: PurePath, test_suite_names: Tuple[str, ...]) -> tuple:
     """
     If this function is run, it will create and build all the suites it contains
 
@@ -350,22 +356,27 @@ def build_suites(sentences, lexicon, editor, save_path: PurePath, test_suite_nam
     #                         expect the model prediction to remain the same.
     # Capability: Vocabulary (neutral words changed)
     test_name_invariance_neutral_words = "invariance_neutral_words"
-    print(f"Creating test: {test_name_invariance_neutral_words}")
-    inv_neutral_suite = create_invariance_test_change_neutral_words(TestSuite(), sentences, lexicon)
-    tests[test_name_invariance_neutral_words] = inv_neutral_suite
+    if test_name_invariance_neutral_words in test_suite_names:
+        print(f"Creating test: {test_name_invariance_neutral_words}")
+        inv_neutral_suite = create_invariance_test_change_neutral_words(TestSuite(), sentences, lexicon,
+                                                                        example_count=100)
+        tests[test_name_invariance_neutral_words] = inv_neutral_suite
 
     ### TEST 2 ###
     test_name_positive_phrases = "directional_positive_phrases"
-    print(f"Creating test {test_name_positive_phrases}")
-      # Create nlp pipeline
-    pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences, editor)
-    tests[test_name_positive_phrases] = pos_suite
+    if test_name_positive_phrases in test_suite_names:
+        print(f"Creating test: {test_name_positive_phrases}")
+        pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences, editor,
+                                                                            example_count=5_000)
+        tests[test_name_positive_phrases] = pos_suite
 
     ### TEST 3 ###
     test_name_negative_phrases = "directional_negative_phrases"
-    print(f"Creating test: {test_name_negative_phrases}")
-    neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences_nlp_pipe, editor)
-    tests[test_name_negative_phrases] = neg_suite
+    if test_name_negative_phrases in test_suite_names:
+        print(f"Creating test: {test_name_negative_phrases}")
+        neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences, editor,
+                                                                            example_count=5_000)
+        tests[test_name_negative_phrases] = neg_suite
 
     ### Test 4 ###
     # TODO finish this test
@@ -384,31 +395,34 @@ def build_suites(sentences, lexicon, editor, save_path: PurePath, test_suite_nam
     return tests, paths
 
 
-def run_all_test_suites(paths: dict) -> None:
+def run_all_test_suites(model_path: PurePath, test_suite_paths: dict, device, max_sequence_length: int) -> None:
     """
-    This function will run all the test suites saved within the test_paths dict.
-    :param paths: dictionary of folder paths for each test suite.
+    This function will run all the test suites saved within the test_paths dict
+    :param model_path: Path to the model
+    :param test_suite_paths: dictionary of folder paths for each test suite.
+    :param device: Pytorch device, such as cpu or gpu.
+    :param max_sequence_length: Maximum sequence length to trim the sentence examples when creating a dataloader.
     :return: None
     """
 
     # Generate a prediction file for each test
-    for test_name, path_to_test_suite in paths.items():
+    for test_name, path_to_test_suite in test_suite_paths.items():
         print(f'Running test: {test_name}')
         # Create a dataloader (NOTE: We're passing the data into the labels as well, because these are not used) to
         # make predictions
         path_to_test_suite = Path(path_to_test_suite)
         data_path = path_to_test_suite / "data.pt"
         dataloader = get_data_loader(data_path=data_path, label_path=data_path,
-                                     shuffle=False, max_sequence_length=pars.max_sequence_length)
+                                     shuffle=False, max_sequence_length=max_sequence_length)
 
         # Run the new examples through the model
-        model = load_model(model_path=str(pars.model_path), device=pars.device)
+        model = load_model(model_path=str(model_path), device=device)
         prediction_lines = create_predictions(model, data_loader=dataloader)
         save_predictions(prediction_lines, path_to_test_suite, file_name="predictions.txt")
-        save_metadata(pars.model_path, path_to_test_suite, data_path, pars.max_sequence_length)
+        save_metadata(model_path, path_to_test_suite, data_path, max_sequence_length)
 
     # Run the analysis
-    for test_name, path_to_test_suite in paths.items():
+    for test_name, path_to_test_suite in test_suite_paths.items():
         path_to_test_suite = Path(path_to_test_suite)
         prediction_path = path_to_test_suite / "predictions.txt"
         test_suite_path = path_to_test_suite / "test.pkl"
@@ -428,7 +442,7 @@ def _parse_args() -> argparse.Namespace:
 @dataclass
 class RunningParametersAmazonReviews:
     run_tests_from_pkl: bool = False
-    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_10exs.csv"
+    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data.csv"
     label_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_labels.pt"
     prediction_file_path: PurePath = PROJECT_ROOT / "predictions" / "sentiment" / "amazon_reviews" / "bert_trained" / "bert_multilingual.txt"
     suite_save_root: PurePath = PROJECT_ROOT / "test_suites" / "sentiment"
@@ -436,6 +450,7 @@ class RunningParametersAmazonReviews:
     max_sequence_length: int = 75
     model_path: PurePath = PROJECT_ROOT / "models" / "sentiment" / "bert_multilingual_amazon_reviews_hugging"
     device: str = "cpu"
+    test_names = ("directional_positive_phrases", "directional_negative_phrases")  # ("invariance_neutral_words", "directional_positive_phrases", "directional_negative_phrases")
     rebuild_test_suites: bool = False
 
 
@@ -482,8 +497,6 @@ if __name__ == "__main__":
         raise ValueError(f"Parameters of type {type(pars)} not of correct type.")
 
     # Build test suites
-    # test_names = ["invariance_neutral_words", "directional_positive_phrases", "directional_negative_phrases"]
-    test_names = ["directional_negative_phrases"]
     if pars.rebuild_test_suites:
         # Create an Editor
         print("Loading Editor")
@@ -493,13 +506,14 @@ if __name__ == "__main__":
         # Rebuild the test suites
         print("Rebuilding test suites...")
         test_suites, test_suite_paths = build_suites(sentences, lexicon, editor, save_path=pars.suite_save_root,
-                                                     test_suite_names=test_names)
+                                                     test_suite_names=pars.test_names)
     else:
         # Create a dictionary of paths to the test suites
-        test_suite_paths = create_suite_file_paths(root_path=pars.suite_save_root, keys=test_names)
+        test_suite_paths = create_suite_file_paths(root_path=pars.suite_save_root, keys=pars.test_names)
 
     # Run the tests
     print("Running all test suites")
-    run_all_test_suites(paths=test_suite_paths)
+    run_all_test_suites(model_path=pars.model_path, test_suite_paths=test_suite_paths, device=pars.device,
+                        max_sequence_length=pars.max_sequence_length)
 
     print("Closing program")
