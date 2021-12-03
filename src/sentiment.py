@@ -23,6 +23,28 @@ from create_predictions import create_predictions, load_model, get_device, save_
 PROJECT_ROOT = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def get_parameters(args):
+    data_selection = args.data_selection
+
+    # Running Parameters
+    if data_selection == "airline_tweets":
+        parameters = RunningParametersAirlineTweets()
+    elif data_selection == "amazon_reviews":
+        parameters = RunningParametersAmazonReviews()
+    else:
+        print("Please select from: \"airline_tweets\" or \"amazon_reviews\"")
+        parameters = None
+    parameters.device = get_device()
+
+    # Check for errors in parameters
+    if ".pkl" not in str(parameters.suite_file_name):
+        raise ValueError("suite_save_pkl_path must contain .pkl file extension")
+    if ".txt" not in str(parameters.prediction_file_path):
+        raise ValueError("prediction_file_path must contain a .txt file extension")
+
+    return parameters
+
+
 def load_editor(editor: Editor, suite_name: str) -> Tuple[Editor, dict]:
     """
     This function will load predifined lexicon to the Editor. This lexicon is used when creating tests,
@@ -356,27 +378,30 @@ def build_suites(sentences, lexicon, editor, save_path: PurePath, test_suite_nam
     #                         expect the model prediction to remain the same.
     # Capability: Vocabulary (neutral words changed)
     test_name_invariance_neutral_words = "invariance_neutral_words"
+    n = 100
     if test_name_invariance_neutral_words in test_suite_names:
         print(f"Creating test: {test_name_invariance_neutral_words}")
         inv_neutral_suite = create_invariance_test_change_neutral_words(TestSuite(), sentences, lexicon,
-                                                                        example_count=100)
-        tests[test_name_invariance_neutral_words] = inv_neutral_suite
+                                                                        example_count=n)
+        tests[test_name_invariance_neutral_words] = {"suite": inv_neutral_suite, "samples": n}
 
     ### TEST 2 ###
     test_name_positive_phrases = "directional_positive_phrases"
+    n = 5_000
     if test_name_positive_phrases in test_suite_names:
         print(f"Creating test: {test_name_positive_phrases}")
         pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences, editor,
-                                                                            example_count=5_000)
-        tests[test_name_positive_phrases] = pos_suite
+                                                                            example_count=n)
+        tests[test_name_positive_phrases] = {"suite": pos_suite, "samples": n}
 
     ### TEST 3 ###
     test_name_negative_phrases = "directional_negative_phrases"
+    n = 5_000
     if test_name_negative_phrases in test_suite_names:
         print(f"Creating test: {test_name_negative_phrases}")
         neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences, editor,
-                                                                            example_count=5_000)
-        tests[test_name_negative_phrases] = neg_suite
+                                                                            example_count=n)
+        tests[test_name_negative_phrases] = {"suite": neg_suite, "samples": n}
 
     ### Test 4 ###
     # TODO finish this test
@@ -385,9 +410,11 @@ def build_suites(sentences, lexicon, editor, save_path: PurePath, test_suite_nam
     # suite = create_mft_test_negation(suite, sentences, lexicon)
 
     # Save and build any suites added to the dictionary.
-    for test_name, suite in tests.items():
+    for test_name, suite_dict in tests.items():
+        suite = suite_dict["suite"]
+        n = suite_dict["samples"]
         save_build_suite(suite, save_path=save_path / test_name,
-                         file_name="test.pkl", samples=100)
+                         file_name="test.pkl", samples=n)
 
     # Define all the save paths
     paths = create_suite_file_paths(root_path=save_path, keys=test_suite_names)
@@ -440,6 +467,16 @@ def _parse_args() -> argparse.Namespace:
 
 
 @dataclass
+class RunningParametersAirlineTweets:
+    run_tests_from_pkl: bool = False
+    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "airline_tweets" / "Tweets.csv"
+    label_file_path: PurePath = None
+    prediction_file_path: PurePath = PROJECT_ROOT / "predictions" / "sentiment" / "airline_tweets" / "bert.txt"
+    suite_save_root: PurePath = PROJECT_ROOT / "test_suites" / "sentiment"
+    suite_file_name: str = "test_suite_sentiment_airline_tweets.pkl"
+
+
+@dataclass
 class RunningParametersAmazonReviews:
     run_tests_from_pkl: bool = False
     data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data.csv"
@@ -450,45 +487,23 @@ class RunningParametersAmazonReviews:
     max_sequence_length: int = 75
     model_path: PurePath = PROJECT_ROOT / "models" / "sentiment" / "bert_multilingual_amazon_reviews_hugging"
     device: str = "cpu"
-    test_names = ("directional_positive_phrases", "directional_negative_phrases")  # ("invariance_neutral_words", "directional_positive_phrases", "directional_negative_phrases")
+    # Choose the tests to run. This can take a long time, depending on the example count in the TestSuite.
+    test_names = ("invariance_neutral_words", )  # ("invariance_neutral_words", "directional_positive_phrases", "directional_negative_phrases")
+    # Choose to rebuild all of the test_names test suites. This can take a long time, depending on the TestSuite.
     rebuild_test_suites: bool = False
-
-
-@dataclass
-class RunningParametersAirlineTweets:
-    run_tests_from_pkl: bool = False
-    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "airline_tweets" / "Tweets.csv"
-    label_file_path: PurePath = None
-    prediction_file_path: PurePath = PROJECT_ROOT / "predictions" / "sentiment" / "airline_tweets" / "bert.txt"
-    suite_save_root: PurePath = PROJECT_ROOT / "test_suites" / "sentiment"
-    suite_file_name: str = "test_suite_sentiment_airline_tweets.pkl"
 
 
 if __name__ == "__main__":
     # Arguments
     args = _parse_args()
-    data_selection = args.data_selection
 
-    # Running Parameters
-    if data_selection == "airline_tweets":
-        pars = RunningParametersAirlineTweets()
-    elif data_selection == "amazon_reviews":
-        pars = RunningParametersAmazonReviews()
-    else:
-        print("Please select from: \"airline_tweets\" or \"amazon_reviews\"")
-        pars = None
-    pars.device = get_device()
+    # Check the parameters for valid values
+    pars = get_parameters(args)
 
-    # Check for errors in parameters
-    if ".pkl" not in str(pars.suite_file_name):
-        raise ValueError("suite_save_pkl_path must contain .pkl file extension")
-    if ".txt" not in str(pars.prediction_file_path):
-        raise ValueError("prediction_file_path must contain a .txt file extension")
-
+    # Load the data
     if isinstance(pars, RunningParametersAirlineTweets):
         data = load_airline_tweets_data(pars.data_file_path)
         labels, confs, airlines, sentences, reasons = data  # unpack
-        # parsed_data = parse_data(sentences)  # TODO determine if this is required
         parsed_data = sentences
     elif isinstance(pars, RunningParametersAmazonReviews):
         sentences, labels, labels_torch = load_amazon_review_data(data_path=pars.data_file_path,

@@ -1,0 +1,61 @@
+Running test: invariance_neutral_words
+Vocabulary
+change neutral words with BERT
+Test cases:      98
+Fails (rate):    3 (3.1%)
+
+Example fails:
+3 (0.7) More for kids, again its the controls I have a problem with, too slow, lol. But it is fun when I compete against my grandkids.
+2 (0.5) More for kids, again its the controls I have this problem with, too slow, lol. But it is fun when I compete against my grandkids.
+
+----
+4 (0.7) Mario Kart DS is a fun game for kids of all ages. Kids ages 6 and up will have the most success playing this game. There is a very large variety of race coarses, players, and karts. Some thing about this game can get frustrating, especially when you have to do Missions to unlock items and help win the game. The Missions (the last several) are tricky, despite the fact I am an experienced player. Overall the graphics are great and fun. I love this game.
+3 (0.8) Mario Kart DS is a fun game for kids of all ages. Kids ages 6 and up will have the most success playing the game. There is a very large variety of race coarses, players, and karts. Some thing about the game can get frustrating, especially when you have to do Missions to unlock items and help win the game. The Missions (the last several) are tricky, despite the fact I am an experienced player. Overall the graphics are great and fun. I love the game.
+3 (0.8) Mario Kart DS is a fun game for kids of all ages. Kids ages 6 and up will have the most success playing the game. There is a very large variety of race coarses, players, and karts. Some thing about the game can get frustrating, especially when you have to do Missions to unlock items and help win the game. The Missions (the last several) are tricky, despite the fact I am an experienced player. Overall the graphics are great and fun. I love the game.
+
+----
+1 (0.5) At first, this is a really fun game but my big problem with it is it's WAY TOO EASY.  Even on the hard settings, I had no problem. After you unlock everything, it gets very boring and I don't play it now.  It would be really good if it had a really hard level or more tracks to race on.  It was fun while it lasted but it's just not challenging enough.
+2 (0.6) At first, this is a really fun game but one big problem with it is it's WAY TOO EASY.  Even on the hard settings, I had no problem. After you unlock everything, it gets very boring and I don't play it now.  It would be really good if it had a really hard level or more tracks to race on.  It was fun while it lasted but it's just not challenging enough.
+
+----
+
+Running test: directional_positive_phrases
+Vocabulary
+add positive phrases
+Test cases:      5000
+Fails (rate):    72 (1.4%)
+
+Example fails:
+4 (1.0) i bought the wireless controller because i was tried of wrapping and twisting the cables on the controller up, getting tangled up with other things, and never reaching where i wanted to sit.  the controller is versaltile and can be used as a wired remote when batteries are dead.
+4 (0.7) i bought the wireless controller because i was tried of wrapping and twisting the cables on the controller up, getting tangled up with other things, and never reaching where i wanted to sit.  the controller is versaltile and can be used as a wired remote when batteries are dead. The game is good.
+
+----
+4 (0.7) I love playing this game. it has alot of different endings and its a great wifi game. The controls are a little different only because you use the touch screen to control your movement but youll get use to it after the first level or so. if you love star fox then this game wont disappoint.
+3 (0.9) I love playing this game. it has alot of different endings and its a great wifi game. The controls are a little different only because you use the touch screen to control your movement but youll get use to it after the first level or so. if you love star fox then this game wont disappoint. The game is good.
+
+----
+3 (0.4) Halo 1 and Halo 2 are icons of the video game industry(rightfully so).But Halo 3 ( and all after it) just don't have the same playful and lighthearted feel of the first  two Halo games.Hardcore fans may enjoy it, otherwise steer clear and play Halo 1 or Halo 2 again.
+3 (1.0) Halo 1 and Halo 2 are icons of the video game industry(rightfully so).But Halo 3 ( and all after it) just don't have the same playful and lighthearted feel of the first  two Halo games.Hardcore fans may enjoy it, otherwise steer clear and play Halo 1 or Halo 2 again. This game was good.
+
+----
+
+Running test: directional_negative_phrases
+Vocabulary
+add negative phrases
+Test cases:      5000
+Fails (rate):    214 (4.3%)
+
+Example fails:
+0 (1.0) If you like dying a lot, and by a lot i mean a lot, without every getting anything done this is the game for you. controls are crap, gameplay is crap, and you only have 3 game days to beat the game.
+0 (0.3) If you like dying a lot, and by a lot i mean a lot, without every getting anything done this is the game for you. controls are crap, gameplay is crap, and you only have 3 game days to beat the game. The game is creepy.
+
+----
+4 (0.4) Always need some point on your Xbox live account.Nothing much to say about it.Scratch, redeem the code and put it in your account, and start spending
+4 (0.9) Always need some point on your Xbox live account.Nothing much to say about it.Scratch, redeem the code and put it in your account, and start spending. The game is creepy.
+
+----
+2 (0.3) If it wasn't for the DRM I would give it high scores.  However, it is asking to much to have only 3 installs.  I would wait until EA gets it through their thick heads to remove the install limits before buying it.
+2 (0.3) If it wasn't for the DRM I would give it high scores.  However, it is asking to much to have only 3 installs.  I would wait until EA gets it through their thick heads to remove the install limits before buying it. The game is creepy.
+2 (0.9) If it wasn't for the DRM I would give it high scores.  However, it is asking to much to have only 3 installs.  I would wait until EA gets it through their thick heads to remove the install limits before buying it. The game is average.
+
+----
