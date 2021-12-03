@@ -72,7 +72,6 @@ def encode_and_save_data(all_data_df: pd.DataFrame, tokenizer_path: str, file_na
     example_created_count, idx, idx_list = 0, idx_start, []
 
     while example_created_count < example_count:
-        example = "ex-" + str(idx)
         review = all_data_df[ex_col].iloc[idx]
 
         # Skip any reviews without review text sequence
