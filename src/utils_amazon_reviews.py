@@ -1,12 +1,13 @@
 from pathlib import PurePath, Path
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer
 import torch
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import gzip
 import os
 import json
-from typing import Tuple, Dict, Optional, Union, List
+from typing import Tuple, Optional, Union, List
+import spacy
 
 PROJECT_ROOT = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -186,5 +187,8 @@ def load_amazon_review_data(data_path: Union[str, PurePath], label_path: Union[s
     return sentences, labels, labels_torch
 
 
+def parse_data(sentences: List[str]):
+    nlp = spacy.load('en_core_web_sm')
+    return list(nlp.pipe(sentences))
 
 
