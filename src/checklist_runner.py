@@ -9,7 +9,7 @@ from checklist.test_suite import TestSuite
 from utils_airline_tweets import load_airline_tweets_data
 from utils_amazon_reviews import load_amazon_review_data, convert_txt_to_encoded_pt, get_data_loader
 from create_predictions import create_predictions, load_model, get_device, save_predictions, save_metadata
-from mft_test_suites import create_mft_test_negation
+from mft_test_suites import create_mft_negated_negative, create_mft_negated_positive
 from invariance_test_suites import create_invariance_test_change_neutral_words
 from direction_test_suites import create_directional_expression_test_add_positive_phrases, \
     create_directional_expression_test_add_negative_phrases
@@ -31,20 +31,15 @@ def get_parameters(args):
     parameters.device = get_device()
 
     # Check for errors in parameters
-    if ".pkl" not in str(parameters.suite_file_name):
-        raise ValueError("suite_save_pkl_path must contain .pkl file extension")
-    if ".txt" not in str(parameters.prediction_file_path):
-        raise ValueError("prediction_file_path must contain a .txt file extension")
 
     return parameters
 
 
-def load_editor(editor: Editor, suite_name: str) -> Tuple[Editor, dict]:
+def load_editor(editor: Editor) -> Tuple[Editor, dict]:
     """
     This function will load predifined lexicon to the Editor. This lexicon is used when creating tests,
     such as in create_invariance_test_change_neutral_words().
     :param editor: Editor to load lexicon to.
-    :param suite_name: Define the test suite name, which is used to organize the data, lexicon, etc.
     :return: Editor, used for text generation
     """
     # Text generator
@@ -92,16 +87,9 @@ def load_editor(editor: Editor, suite_name: str) -> Tuple[Editor, dict]:
     editor.add_lexicon('object_words', object_words, overwrite=True)
 
     # Customize lexicon to the data set used
-    if suite_name == "airline_tweets":
-        # Pre-defined lexicon
-        air_noun = ['flight', 'seat', 'pilot', 'staff', 'service', 'customer service', 'aircraft', 'plane', 'food',
-                    'cabin crew', 'company', 'airline', 'crew']
-        editor.add_lexicon('air_noun', air_noun)
-        lexicon['air_noun'] = air_noun
-    elif suite_name == "amazon_reviews":
-        review_noun = ['service', 'staff', 'delivery', 'driver', 'food', 'company', 'customer']
-        editor.add_lexicon('review_noun', review_noun)
-        lexicon['review_noun'] = review_noun
+    review_noun = ['service', 'staff', 'delivery', 'driver', 'food', 'company', 'customer']
+    editor.add_lexicon('review_noun', review_noun)
+    lexicon['review_noun'] = review_noun
 
     return editor, lexicon
 
@@ -177,21 +165,6 @@ def build_all_test_suites(sentences: List[str], labels: List[str], lexicon, edit
     :param test_suite_names: List[str] of all the test suite names to build.
     :return: tuple of (dict of TestSuites, dict of paths to test suite folders)
     """
-    """
-    In order to guide test ideation, it's useful to think of CheckList as a matrix of Capabilities x Test Types.
-    *Capabilities* refers to general-purpose linguistic capabilities, which manifest in one way or another in almost any NLP application.
-    We suggest that anyone CheckListing a model go through *at least* the following capabilities, trying to create MFTs, INVs, and DIRs for each if possible.
-    1. **Vocabulary + POS:** important words or groups of words (by part-of-speech) for the task
-    2. **Taxonomy**: synonyms, antonyms, word categories, etc
-    3. **Robustness**: to typos, irrelevant additions, contractions, etc
-    4. **Named Entity Recognition (NER)**: person names, locations, numbers, etc
-    5. **Fairness**
-    6. **Temporal understanding**: understanding order of events and how they impact the task
-    7. **Negation**
-    8. **Coreference**
-    9. **Semantic Role Labeling (SRL)**: understanding roles such as agent, object, passive/active, etc
-    10. **Logic**: symmetry, consistency, conjunctions, disjunctions, etc
-    """
     tests = {}
 
     ### TEST 1 ###
@@ -225,13 +198,17 @@ def build_all_test_suites(sentences: List[str], labels: List[str], lexicon, edit
         tests[test_name_negative_phrases] = {"suite": neg_suite, "samples": n}
 
     ### Test 4 ###
-    # TODO finish this test
-    # Test type: Minimum Functionality Test (MFT) - used to verify the model has specific capabilities.
-    # Capability: Vocabulary, Can the model handle negation?
-    test_name_mft_negation = "MFT_Vocabulary_word_negation"
+    test_name_mft_negation = "MFT_Negation_negated_positive"
     n = 5_000
     if test_name_mft_negation in test_suite_names:
-        mft_negation_suite = create_mft_test_negation(TestSuite(), sentences, labels, lexicon, editor=editor, example_count=n)
+        mft_negation_suite = create_mft_negated_positive(TestSuite(), sentences, labels, lexicon, editor=editor, example_count=n)
+        tests[test_name_mft_negation] = {"suite": mft_negation_suite, "samples": n}
+
+    ### Test 5 ###
+    test_name_mft_negation = "MFT_Negation_negated_negative"
+    n = 5_000
+    if test_name_mft_negation in test_suite_names:
+        mft_negation_suite = create_mft_negated_negative(TestSuite(), sentences, labels, lexicon, editor=editor, example_count=n)
         tests[test_name_mft_negation] = {"suite": mft_negation_suite, "samples": n}
 
     # Make directory if missing
@@ -312,22 +289,22 @@ class RunningParametersAmazonReviews:
     label_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_labels.pt"
     prediction_file_path: PurePath = PROJECT_ROOT / "predictions" / "sentiment" / "amazon_reviews" / "bert_trained" / "bert_multilingual.txt"
     suite_save_root: PurePath = PROJECT_ROOT / "test_suites" / "sentiment"
-    suite_file_name: str = "test_suite_sentiment_amazon_reviews.pkl"
     max_sequence_length: int = 75
     model_path: PurePath = PROJECT_ROOT / "models" / "sentiment" / "bert_multilingual_amazon_reviews_hugging"
     device: str = "cpu"
     # Choose the tests to run, put them in a Tuple[str, ...].
     # This can take a long time, depending on the example count in the TestSuite.
     # Full list:
-    #   "MFT_Vocabulary_word_negation"
-    #   "MFT_Vocabulary_add negative phrases"
+    #   "MFT_Negation_negated_positive"
+    #   "MFT_Negation_negated_negative"
+    #   "NER_Switching_Names"
     #   "INV_Vocabulary_neutral_word_change"
     #   "DIR_Vocabulary_add_negative_phrases"
     #   "DIR_Vocabulary_add_positive_phrases"
-    test_names: tuple = ("MFT_Vocabulary_word_negation", "INV_Vocabulary_neutral_word_change", "DIR_Vocabulary_add_negative_phrases", "DIR_Vocabulary_add_positive_phrases")
+    test_names: tuple = ("MFT_Negation_negated_negative",)
     # Choose to rebuild all test suites in the test_names tuple.
     # This can take a long time, depending on the TestSuite.
-    rebuild_test_suites: bool = False
+    rebuild_test_suites: bool = True
 
 
 if __name__ == "__main__":
@@ -353,7 +330,7 @@ if __name__ == "__main__":
         # Create an Editor
         print("Loading Editor")
         editor = Editor()
-        editor, lexicon = load_editor(editor, suite_name=pars.suite_file_name)
+        editor, lexicon = load_editor(editor)
 
         # Rebuild the test suites
         print("Rebuilding test suites...")
