@@ -1,0 +1,3 @@
+Model source: C:\Users\lkell\Documents\Projects\final_project_NLP_UTAustin\models\sentiment\bert_multilingual_amazon_reviews_hugging
+Data source: C:\Users\lkell\Documents\Projects\final_project_NLP_UTAustin\test_suites\sentiment\INV_Vocabulary_neutral_word_change\data.pt
+Max sequence length of each sentence: 75

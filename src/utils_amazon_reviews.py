@@ -1,12 +1,13 @@
 from pathlib import PurePath, Path
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer
 import torch
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import gzip
 import os
 import json
-from typing import Tuple, Dict, Optional, Union, List
+from typing import Tuple, Optional, Union, List
+import spacy
 
 PROJECT_ROOT = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -177,14 +178,26 @@ def get_data_loader(data_path: Union[str, PurePath], label_path: Union[str, Pure
 
 
 def load_amazon_review_data(data_path: Union[str, PurePath], label_path: Union[str, PurePath]):
-    # Convert to a dataframe
+    """
+    This function will load the dataset specified in data_path for amazon reviews from a .csv.
+    :param data_path: Path to the .csv review data.
+    :param label_path: Path to the pytorch .pt label data.
+    :return:
+    """
+    # Load the amazon reviews from CSV
     data = pd.read_csv(data_path)
     sentences = data["reviewText"].to_list()
     labels = data["overall"].to_list()
+
+    # Load the labels from pytorch .pt file
     labels_torch = torch.load(f=label_path)
     # labels_torch = labels_torch.numpy().tolist()
+
     return sentences, labels, labels_torch
 
 
+def parse_data(sentences: List[str]):
+    nlp = spacy.load('en_core_web_sm')
+    return list(nlp.pipe(sentences))
 
 

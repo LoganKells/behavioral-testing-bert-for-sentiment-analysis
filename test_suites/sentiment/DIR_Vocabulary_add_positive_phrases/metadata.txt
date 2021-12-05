@@ -1,3 +1,3 @@
 Model source: C:\Users\lkell\Documents\Projects\final_project_NLP_UTAustin\models\sentiment\bert_multilingual_amazon_reviews_hugging
-Data source: C:\Users\lkell\Documents\Projects\final_project_NLP_UTAustin\test_suites\sentiment\directional_negative_phrases\data.pt
+Data source: C:\Users\lkell\Documents\Projects\final_project_NLP_UTAustin\test_suites\sentiment\DIR_Vocabulary_add_positive_phrases\data.pt
 Max sequence length of each sentence: 75
