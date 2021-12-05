@@ -1,24 +1,18 @@
 import argparse
 from dataclasses import dataclass
-from typing import List, Union, Tuple, Literal
+from typing import List, Union, Tuple
 import os
 from pathlib import Path, PurePath
-import numpy as np
-import spacy
-import json
 
 from checklist.editor import Editor
-import checklist
-import itertools
-import checklist.editor
-import checklist.text_generation
-from checklist.test_types import MFT, INV, DIR
-from checklist.expect import Expect
 from checklist.test_suite import TestSuite
-from checklist.perturb import Perturb
 from utils_airline_tweets import load_airline_tweets_data
 from utils_amazon_reviews import load_amazon_review_data, convert_txt_to_encoded_pt, get_data_loader
 from create_predictions import create_predictions, load_model, get_device, save_predictions, save_metadata
+from mft_test_suites import create_mft_test_negation
+from invariance_test_suites import create_invariance_test_change_neutral_words
+from direction_test_suites import create_directional_expression_test_add_positive_phrases, \
+    create_directional_expression_test_add_negative_phrases
 
 PROJECT_ROOT = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -63,22 +57,24 @@ def load_editor(editor: Editor, suite_name: str) -> Tuple[Editor, dict]:
                'frustrating', 'hard', 'lame', 'nasty', 'annoying', 'boring', 'creepy', 'dreadful', 'ridiculous',
                'terrible', 'ugly', 'unpleasant']
     neutral_adj = ['American', 'international', 'commercial', 'British', 'private', 'Italian', 'Indian', 'Australian',
-                   'Israeli', ]
+                   'Israeli', 'Chinese', 'blue', 'black', 'grey', 'red', 'yellow', 'public']
     pos_verb_present = ['like', 'enjoy', 'appreciate', 'love', 'recommend', 'admire', 'value', 'welcome']
     neg_verb_present = ['hate', 'dislike', 'regret', 'abhor', 'dread', 'despise']
-    neutral_verb_present = ['see', 'find']
+    neutral_verb_present = ['see', 'find', 'break', 'learn', 'create', 'build']
     pos_verb_past = ['liked', 'enjoyed', 'appreciated', 'loved', 'admired', 'valued', 'welcomed']
     neg_verb_past = ['hated', 'disliked', 'regretted', 'abhorred', 'dreaded', 'despised']
     neutral_verb_past = ['saw', 'found']
     neutral_words = {'.', 'the', 'The', ',', 'a', 'A', 'and', 'of', 'to', 'it', 'that', 'in', 'this', 'for', 'you',
                      'there', 'or', 'an', 'by', 'about', 'flight', 'my', 'in', 'of', 'have', 'with', 'was', 'at', 'it',
                      'get', 'from', 'this', 'Flight', 'plane'}
+    object_words = ['book', 'buy', 'movie', 'game', 'video game', 'playable', 'title', 'experience', 'time', 'graphics',
+                    'story', 'plot', 'gameplay', 'play']
 
     lexicon = {'pos_adj': pos_adj, 'neg_adj': neg_adj, 'neutral_adj': neutral_adj,
                'pos_verb_present': pos_verb_present, 'neg_verb_present': neg_verb_present,
                'neutral_verb_present': neutral_verb_present, 'pos_verb_past': pos_verb_past,
                'neg_verb_past': neg_verb_past, 'neutral_verb_past': neutral_verb_past,
-               'neutral_words': neutral_words}
+               'neutral_words': neutral_words, 'object_words': object_words}
 
     # Add data to the Editor
     editor.add_lexicon('pos_adj', pos_adj, overwrite=True)
@@ -93,6 +89,7 @@ def load_editor(editor: Editor, suite_name: str) -> Tuple[Editor, dict]:
     editor.add_lexicon('pos_verb', pos_verb_present + pos_verb_past, overwrite=True)
     editor.add_lexicon('neg_verb', neg_verb_present + neg_verb_past, overwrite=True)
     editor.add_lexicon('neutral_verb', neutral_verb_present + neutral_verb_past, overwrite=True)
+    editor.add_lexicon('object_words', object_words, overwrite=True)
 
     # Customize lexicon to the data set used
     if suite_name == "airline_tweets":
@@ -107,185 +104,6 @@ def load_editor(editor: Editor, suite_name: str) -> Tuple[Editor, dict]:
         lexicon['review_noun'] = review_noun
 
     return editor, lexicon
-
-
-def parse_data(sentences: List[str]):
-    nlp = spacy.load('en_core_web_sm')
-    return list(nlp.pipe(sentences))
-
-
-def create_mft_test_negation(suite: TestSuite, sentences: List[str], lexicon: dict) -> TestSuite:
-    """
-    This funciton will add a Minimum Functionality Test (MFT) to the TestSuite to check the model's capability
-    to handle word negation
-    :param suite: TestSuite to add the test to.
-    :param sentences: Training data sentences.
-    :param lexicon: Lexicon defined for the dataset.
-    :return: TestSuite with the new test added.
-    """
-    # Create a list of positive and negative adjectives
-
-    # Create data with positive and negative negations, where 1=positive, 0=negative
-    editor = Editor()
-    ret = editor.template('This is not {a:pos} {mask}.', pos=lexicon['pos_adj'], labels=0, save=True, nsamples=100)
-    ret += editor.template('This is not {a:neg} {mask}.', neg=lexicon['neg_adj'], labels=1, save=True, nsamples=100)
-
-    test = MFT(ret.data, labels=ret.labels, name='Simple negation', capability='Negation',
-               description='Very simple negations.')
-    raise NotImplementedError("Need to finish this function")
-
-
-def create_invariance_test_change_neutral_words(suite: TestSuite, sentences: List[str], lexicon: dict,
-                                                example_count: int) -> TestSuite:
-    """
-    This function will add an Invariance test to the TestSuite where neutral words are randomly replaced.
-    INVariance: change neutral words. See https://github.com/marcotcr/checklist/blob/master/notebooks/Sentiment.ipynb
-    :param suite: TestSuite to add the test to.
-    :param sentences: Training data sentences.
-    :param lexicon: Lexicon defined for the dataset.
-    :param example_count: Number of examples the test suite will create
-    :return: TestSuite with the new test added.
-    """
-    forbidden = set(['No', 'no', 'Not', 'not', 'Nothing', 'nothing', 'without',
-                     'but'] + lexicon['pos_adj'] + lexicon['neg_adj'] + lexicon['pos_verb_present'] +
-                    lexicon['pos_verb_past'] + lexicon['neg_verb_present'] + lexicon['neg_verb_past'])
-
-    # Swap out netural words with replacements
-    def change_neutral(d):
-        #     return d.text
-        examples = []
-        subs = []
-        words_in = [x for x in d.capitalize().split() if x in lexicon['neutral_words']]
-        if not words_in:
-            return None
-        for w in words_in:
-            suggestions = [x for x in editor.suggest_replace(d, w, beam_size=5, words_and_sentences=True) if
-                           x[0] not in forbidden]
-            examples.extend([x[1] for x in suggestions])
-            subs.extend(['%s -> %s' % (w, x[0]) for x in suggestions])
-        if examples:
-            idxs = np.random.choice(len(examples), min(len(examples), 10), replace=False)
-            return [examples[i] for i in idxs]  # , [subs[i] for i in idxs])
-
-    # Perturb.perturb(parsed_data[:5], perturb)
-
-    t = Perturb.perturb(sentences, change_neutral, nsamples=example_count)
-    test = INV(t.data)
-    description = 'Change a set of neutral words with other context-appropriate neutral words (using BERT).'
-
-    # Add to suite
-    test_name = 'change neutral words with BERT'
-    suite.add(test, name=test_name, capability='Vocabulary', description=description)
-
-    return suite
-
-
-def create_directional_expression_test_add_positive_phrases(suite: TestSuite, sentences: List[str],
-                                                            editor: Editor, example_count: int) -> TestSuite:
-    """
-    This function will add a DIRectional Expression Test: add strongly positive phrases to end of sentence
-    See https://github.com/marcotcr/checklist/blob/master/notebooks/Sentiment.ipynb
-    :param suite: TestSuite to add the test to.
-    :param sentences: Training data sentences.
-    :param lexicon: Lexicon defined for the dataset.
-    :param example_count: The number of examples the test suite will create.
-    :return: TestSuite with the new test added.
-    """
-    positive = editor.template('I {pos_verb_present} this game.').data
-    positive += editor.template('The game is {pos_adj}.').data
-    positive += editor.template('This game is {pos_adj}.').data
-    positive += editor.template('This game was {pos_adj}.').data
-    positive += ['I want to play this game over and over again.']
-    positive += ['I love this game.']
-
-    # Send the sentences through an NLP pipeline
-    sentences_nlp = parse_data(sentences)
-
-    def diff_up(orig_pred, pred, orig_conf, conf, labels=None, meta=None):
-        tolerance = 0.1
-        change = positive_change(orig_conf, conf)
-        if change + tolerance >= 0:
-            return True
-        else:
-            return change + tolerance
-
-    goes_up = Expect.pairwise(diff_up)
-    t = Perturb.perturb(sentences_nlp, add_phrase_function(positive), nsamples=example_count)
-    test = DIR(t.data, goes_up)
-    description = 'Add very positive phrases (e.g. I love this game) to the end of sentences, ' \
-                  'expect probability of positive to NOT go down (tolerance=0.1)'
-    suite.add(test, name='add positive phrases', capability='Vocabulary', description=description)
-
-    return suite
-
-
-def create_directional_expression_test_add_negative_phrases(suite: TestSuite, sentences: List[str],
-                                                            editor: Editor, example_count: int) -> TestSuite:
-    """
-    This function will add DIRectional Expression Test: add strongly negative phrases to end of sentence
-    See https://github.com/marcotcr/checklist/blob/master/notebooks/Sentiment.ipynb
-    :param suite: TestSuite to add the test to.
-    :param sentences: Training data sentences.
-    :param lexicon: Lexicon defined for the dataset.
-    :param example_count: The number of examples the test suite will create
-    :return: TestSuite with the new test added.
-    """
-
-    # Send the sentences through an NLP pipeline
-    sentences_nlp = parse_data(sentences)
-
-    negative = editor.template('I {neg_verb_present} this game.').data
-    negative += editor.template('The game is {neg_adj}.').data
-    negative += ['I would never play this game again.']
-
-    def diff_down(orig_pred, pred, orig_conf, conf, labels=None, meta=None):
-        tolerance = 0.1
-        change = positive_change(orig_conf, conf)
-        if change - tolerance <= 0:
-            return True
-        else:
-            return -(change - tolerance)
-
-    goes_down = Expect.pairwise(diff_down)
-    t = Perturb.perturb(sentences_nlp, add_phrase_function(negative), nsamples=example_count)
-    test = DIR(t.data, goes_down)
-    description = 'Add very negative phrases (e.g. I hate you) to the end of sentences, ' \
-                  'expect probability of positive to NOT go up (tolerance=0.1)'
-    suite.add(test, name='add negative phrases', capability='Vocabulary', description=description)
-
-    return suite
-
-
-def add_phrase_function(phrases):
-    """
-    This funciton will add phrases to original
-    examples to creates transformed versions
-    """
-
-    def pert(d):
-        while d[-1].pos_ == 'PUNCT':
-            d = d[:-1]
-        d = d.text
-        ret = [d + '. ' + x for x in phrases]
-        idx = np.random.choice(len(ret), 10, replace=False)
-        ret = [ret[i] for i in idx]
-        return ret
-
-    return pert
-
-
-def positive_change(orig_conf, conf):
-    """
-    This funciton will measure the overall positive change 
-    in in an example that is transformed to have a strong positive
-    or negative phrase added to the end of a sentence. This metric
-    measures the net change in logit values on both ends of the spectrum
-    by comparing the transofmred and non-transformed sentence.
-    """
-    softmax = type(orig_conf) in [np.array, np.ndarray]
-    if not softmax or orig_conf.shape[0] != 5:
-        raise (Exception('Need prediction function to be softmax with 3 labels (negative, neutral, positive)'))
-    return orig_conf[0] - conf[0] + conf[4] - orig_conf[4]
 
 
 def save_build_suite(suite: TestSuite, save_path: Union[str, PurePath],
@@ -348,10 +166,18 @@ def create_suite_file_paths(root_path: PurePath, keys: Tuple[str, ...]) -> dict:
     return test_suite_paths
 
 
-def build_suites(sentences, lexicon, editor, save_path: PurePath, test_suite_names: Tuple[str, ...]) -> tuple:
+def build_all_test_suites(sentences: List[str], labels: List[str], lexicon, editor: Editor, save_path: PurePath,
+                          test_suite_names: Tuple[str, ...]) -> tuple:
     """
-    If this function is run, it will create and build all the suites it contains
-
+    If this function is run, it will create and build all the suites in test_suite_names.
+    :param sentences: List of sentence examples
+    :param labels: List of labels corresponding to the sentences
+    :param lexicon: lexicon loaded to the Editor()
+    :param editor: Editor() that is loaded with lexicon
+    :param test_suite_names: List[str] of all the test suite names to build.
+    :return: tuple of (dict of TestSuites, dict of paths to test suite folders)
+    """
+    """
     In order to guide test ideation, it's useful to think of CheckList as a matrix of Capabilities x Test Types.
     *Capabilities* refers to general-purpose linguistic capabilities, which manifest in one way or another in almost any NLP application.
     We suggest that anyone CheckListing a model go through *at least* the following capabilities, trying to create MFTs, INVs, and DIRs for each if possible.
@@ -365,11 +191,6 @@ def build_suites(sentences, lexicon, editor, save_path: PurePath, test_suite_nam
     8. **Coreference**
     9. **Semantic Role Labeling (SRL)**: understanding roles such as agent, object, passive/active, etc
     10. **Logic**: symmetry, consistency, conjunctions, disjunctions, etc
-    :param sentences: List of sentence examples
-    :param lexicon: lexicon loaded to the Editor()
-    :param editor: Editor() that is loaded with lexicon
-    :param test_suite_names: List[str] of all the test suite names.
-    :return: tuple of (dict of TestSuites, dict of paths to test suite folders)
     """
     tests = {}
 
@@ -377,37 +198,45 @@ def build_suites(sentences, lexicon, editor, save_path: PurePath, test_suite_nam
     # Test type: Invariance - Invariance test (INV) is when we apply label-preserving perturbations to inputs and
     #                         expect the model prediction to remain the same.
     # Capability: Vocabulary (neutral words changed)
-    test_name_invariance_neutral_words = "invariance_neutral_words"
+    test_name_invariance_neutral_words = "INV_Vocabulary_neutral_word_change"
     n = 100
     if test_name_invariance_neutral_words in test_suite_names:
         print(f"Creating test: {test_name_invariance_neutral_words}")
         inv_neutral_suite = create_invariance_test_change_neutral_words(TestSuite(), sentences, lexicon,
-                                                                        example_count=n)
+                                                                        editor=editor, example_count=n)
         tests[test_name_invariance_neutral_words] = {"suite": inv_neutral_suite, "samples": n}
 
     ### TEST 2 ###
-    test_name_positive_phrases = "directional_positive_phrases"
+    test_name_positive_phrases = "DIR_Vocabulary_add_positive_phrases"
     n = 5_000
     if test_name_positive_phrases in test_suite_names:
         print(f"Creating test: {test_name_positive_phrases}")
-        pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences, editor,
-                                                                            example_count=n)
+        pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences,
+                                                                            editor=editor, example_count=n)
         tests[test_name_positive_phrases] = {"suite": pos_suite, "samples": n}
 
     ### TEST 3 ###
-    test_name_negative_phrases = "directional_negative_phrases"
+    test_name_negative_phrases = "DIR_Vocabulary_add_negative_phrases"
     n = 5_000
     if test_name_negative_phrases in test_suite_names:
         print(f"Creating test: {test_name_negative_phrases}")
-        neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences, editor,
-                                                                            example_count=n)
+        neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences,
+                                                                            editor=editor, example_count=n)
         tests[test_name_negative_phrases] = {"suite": neg_suite, "samples": n}
 
     ### Test 4 ###
     # TODO finish this test
     # Test type: Minimum Functionality Test (MFT) - used to verify the model has specific capabilities.
-    # Capability: Can the model handle negation?
-    # suite = create_mft_test_negation(suite, sentences, lexicon)
+    # Capability: Vocabulary, Can the model handle negation?
+    test_name_mft_negation = "MFT_Vocabulary_word_negation"
+    n = 5_000
+    if test_name_mft_negation in test_suite_names:
+        mft_negation_suite = create_mft_test_negation(TestSuite(), sentences, labels, lexicon, editor=editor, example_count=n)
+        tests[test_name_mft_negation] = {"suite": mft_negation_suite, "samples": n}
+
+    # Make directory if missing
+    if not os.path.isdir(save_path):
+        os.mkdir(save_path)
 
     # Save and build any suites added to the dictionary.
     for test_name, suite_dict in tests.items():
@@ -487,9 +316,17 @@ class RunningParametersAmazonReviews:
     max_sequence_length: int = 75
     model_path: PurePath = PROJECT_ROOT / "models" / "sentiment" / "bert_multilingual_amazon_reviews_hugging"
     device: str = "cpu"
-    # Choose the tests to run. This can take a long time, depending on the example count in the TestSuite.
-    test_names = ("invariance_neutral_words", )  # ("invariance_neutral_words", "directional_positive_phrases", "directional_negative_phrases")
-    # Choose to rebuild all of the test_names test suites. This can take a long time, depending on the TestSuite.
+    # Choose the tests to run, put them in a Tuple[str, ...].
+    # This can take a long time, depending on the example count in the TestSuite.
+    # Full list:
+    #   "MFT_Vocabulary_word_negation"
+    #   "MFT_Vocabulary_add negative phrases"
+    #   "INV_Vocabulary_neutral_word_change"
+    #   "DIR_Vocabulary_add_negative_phrases"
+    #   "DIR_Vocabulary_add_positive_phrases"
+    test_names: tuple = ("MFT_Vocabulary_word_negation", "INV_Vocabulary_neutral_word_change", "DIR_Vocabulary_add_negative_phrases", "DIR_Vocabulary_add_positive_phrases")
+    # Choose to rebuild all test suites in the test_names tuple.
+    # This can take a long time, depending on the TestSuite.
     rebuild_test_suites: bool = False
 
 
@@ -520,8 +357,9 @@ if __name__ == "__main__":
 
         # Rebuild the test suites
         print("Rebuilding test suites...")
-        test_suites, test_suite_paths = build_suites(sentences, lexicon, editor, save_path=pars.suite_save_root,
-                                                     test_suite_names=pars.test_names)
+        test_suites, test_suite_paths = build_all_test_suites(sentences, labels, lexicon, editor,
+                                                              save_path=pars.suite_save_root,
+                                                              test_suite_names=pars.test_names)
     else:
         # Create a dictionary of paths to the test suites
         test_suite_paths = create_suite_file_paths(root_path=pars.suite_save_root, keys=pars.test_names)
