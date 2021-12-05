@@ -1,4 +1,4 @@
-Running test: invariance_neutral_words
+Running test: INV_Vocabulary_neutral_word_change
 Vocabulary
 change neutral words with BERT
 Test cases:      98
@@ -19,7 +19,7 @@ Example fails:
 
 ----
 
-Running test: directional_positive_phrases
+Running test: DIR_Vocabulary_add_positive_phrases
 Vocabulary
 add positive phrases
 Test cases:      5000
@@ -39,7 +39,7 @@ Example fails:
 
 ----
 
-Running test: directional_negative_phrases
+Running test: DIR_Vocabulary_add_negative_phrases
 Vocabulary
 add negative phrases
 Test cases:      5000
