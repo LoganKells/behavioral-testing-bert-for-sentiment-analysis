@@ -1,0 +1,82 @@
+C:\Users\lkell\Documents\Projects\final_project_NLP_UTAustin\venv\Scripts\python.exe C:/Users/lkell/Documents/Projects/final_project_NLP_UTAustin/src/checklist_runner.py --data_selection amazon_reviews
+Loading Editor
+Rebuilding test suites...
+C:\Users\lkell\Documents\Projects\final_project_NLP_UTAustin\venv\lib\site-packages\checklist\text_generation.py:171: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at  ..\torch\csrc\utils\tensor_new.cpp:201.)
+  to_pred = torch.tensor(to_pred, device=self.device).to(torch.int64)
+Running all test suites
+Running test: MFT_Negation_negated_positive
+Running test: MFT_Negation_negated_negative
+Vocabulary
+
+MFT_Negation_negated_positive
+Test cases:      4405
+Fails (rate):    2786 (63.2%)
+
+Example fails:
+gold_label: 1, pred_label: 0, confs: [0.42333192 0.21511337 0.17212565 0.09049335 0.09893564], sentence: This is not a beautiful graphics. Wow.
+---------
+gold_label: 0, pred_label: 2, confs: [0.05532655 0.18472058 0.65698904 0.06543904 0.03752473], sentence: This is not a exciting gameplay. You know, I really like turn-based strategy (TBS) games.
+---------
+gold_label: 0, pred_label: 1, confs: [0.04803412 0.83261174 0.10722695 0.00677621 0.00535102], sentence: This is not a beautiful movie. The game was begged by my friends as a must have, I never got into it and felt like it was based around extremely linear and directed GamePlay with no real freedom and too much 'cinema'.
+---------
+gold_label: 0, pred_label: 1, confs: [0.19186233 0.6646098  0.13240923 0.00622123 0.0048974 ], sentence: I do not like this brilliant playable. The campaign to start is confusing.
+---------
+gold_label: 0, pred_label: 4, confs: [0.18536475 0.14699437 0.13909188 0.13364395 0.39490503], sentence: This is not a incredible plot. THIS GAME IS ALL SHOW! Graphics, more graphics, all cut scenes.
+---------
+gold_label: 1, pred_label: 2, confs: [2.4747767e-03 1.7208795e-01 8.2350093e-01 1.2099461e-03 7.2636940e-04], sentence: This is not a exciting buy. I don't like the graphics, so much publicity but the game doesn't have any great, the movements are very slowly and complicate, I prefer Ghost Recon..
+---------
+gold_label: 1, pred_label: 2, confs: [0.21425414 0.28337938 0.34879234 0.08634538 0.06722876], sentence: This is not a sweet game. Older guy rating a kids game so consider that with my review.
+---------
+gold_label: 1, pred_label: 0, confs: [1.0000000e+00 4.9662394e-19 1.2627789e-22 3.6341750e-23 3.4802375e-23], sentence: This is not a enjoyable story. This is frankly the worst game I have ever played.
+---------
+gold_label: 1, pred_label: 0, confs: [0.5861986  0.16722701 0.08924218 0.06255265 0.09477954], sentence: I do not like this adorable experience. Why will it frustrate the living crap out of you?1.
+---------
+gold_label: 1, pred_label: 0, confs: [0.6122496  0.32903373 0.04604971 0.00691849 0.00574851], sentence: I do not like this engaging game. I bought this game for $20 dollars, poped it in, and was really hoping for some great changes to the game.
+---------
+
+
+
+
+Running test: MFT_Negation_negated_negative
+Vocabulary
+
+MFT_Negation_negated_negative
+Test cases:      5002
+Test cases run:  5000
+Fails (rate):    3024 (60.5%)
+
+Example fails:
+gold_label: 4, pred_label: 2, confs: [0.00520233 0.00899701 0.85891235 0.11726051 0.00962773], sentence: I think this is not a boring story. The D-pad feels a little stiff and the plastic is a bit cheap; obviously, it is a lower-priced alternative.
+---------
+gold_label: 3, pred_label: 4, confs: [7.9891860e-11 8.2899640e-11 1.5228134e-10 2.2522277e-08 1.0000000e+00], sentence: This is not a dreadful story. Despite Grand Theft Auto ripoffs like Saints Row and Crackdown stealing spotlight from this classic franchise, it still retains the awesomeness that gamers felt when it was first released and the controversy that angers parents to this day.
+---------
+gold_label: 3, pred_label: 4, confs: [2.6661920e-16 2.6834258e-16 4.4508150e-16 1.9093300e-13 1.0000000e+00], sentence: This is not a lousy video game. Great product, works fine.
+---------
+gold_label: 3, pred_label: 4, confs: [7.3504810e-16 7.4289316e-16 1.2640220e-15 2.2361916e-13 1.0000000e+00], sentence: This is not a average buy. My son loves this game it's so much fun Mario games are always the beys when it comes to kids game.
+---------
+gold_label: 3, pred_label: 4, confs: [3.4648530e-11 3.5676462e-11 6.2297380e-11 4.1690480e-09 1.0000000e+00], sentence: I think this is not a lame playable. Mario Kart for the DS is one of the best racing games in my opinion.
+---------
+gold_label: 3, pred_label: 0, confs: [0.41674614 0.17538808 0.17135428 0.10814223 0.12836929], sentence: This is not a creepy story. Microsoft has just provided 360 owners with another year of warranty.
+---------
+gold_label: 3, pred_label: 4, confs: [0.18772504 0.13749449 0.17140163 0.15583225 0.3475466 ], sentence: I think this is not a dreadful buy. Nancy Drew: Last Train to Blue Moon Canyon...
+---------
+gold_label: 3, pred_label: 4, confs: [7.4207496e-06 7.7915120e-06 1.3604742e-05 1.9215637e-04 9.9977905e-01], sentence: This is not a average game. It's da bomb! The graphics are as realistic as it gets and every bit of your brain can be used.
+---------
+gold_label: 4, pred_label: 3, confs: [0.01940185 0.02332066 0.1220917  0.4320139  0.40317193], sentence: This is not a rough play. I like the new take on Resident Evil Capcom has decided to go with.
+---------
+gold_label: 3, pred_label: 4, confs: [0.01524618 0.01871628 0.07945291 0.3215653  0.5650193 ], sentence: This is not a nasty book. Half Life 2 is a FPS (First Person Shooter) which somehow transcends that genre and is an amazing, fast paced run through cities, ghettos, waterways, beaches, and more.
+---------
+
+
+
+
+Closing program
+
+Process finished with exit code 0
+
+
+
+
+Closing program
+
+Process finished with exit code 0
