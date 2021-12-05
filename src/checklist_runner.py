@@ -57,22 +57,24 @@ def load_editor(editor: Editor, suite_name: str) -> Tuple[Editor, dict]:
                'frustrating', 'hard', 'lame', 'nasty', 'annoying', 'boring', 'creepy', 'dreadful', 'ridiculous',
                'terrible', 'ugly', 'unpleasant']
     neutral_adj = ['American', 'international', 'commercial', 'British', 'private', 'Italian', 'Indian', 'Australian',
-                   'Israeli', ]
+                   'Israeli', 'Chinese', 'blue', 'black', 'grey', 'red', 'yellow', 'public']
     pos_verb_present = ['like', 'enjoy', 'appreciate', 'love', 'recommend', 'admire', 'value', 'welcome']
     neg_verb_present = ['hate', 'dislike', 'regret', 'abhor', 'dread', 'despise']
-    neutral_verb_present = ['see', 'find']
+    neutral_verb_present = ['see', 'find', 'break', 'learn', 'create', 'build']
     pos_verb_past = ['liked', 'enjoyed', 'appreciated', 'loved', 'admired', 'valued', 'welcomed']
     neg_verb_past = ['hated', 'disliked', 'regretted', 'abhorred', 'dreaded', 'despised']
     neutral_verb_past = ['saw', 'found']
     neutral_words = {'.', 'the', 'The', ',', 'a', 'A', 'and', 'of', 'to', 'it', 'that', 'in', 'this', 'for', 'you',
                      'there', 'or', 'an', 'by', 'about', 'flight', 'my', 'in', 'of', 'have', 'with', 'was', 'at', 'it',
                      'get', 'from', 'this', 'Flight', 'plane'}
+    object_words = ['book', 'buy', 'movie', 'game', 'video game', 'playable', 'title', 'experience', 'time', 'graphics',
+                    'story', 'plot', 'gameplay', 'play']
 
     lexicon = {'pos_adj': pos_adj, 'neg_adj': neg_adj, 'neutral_adj': neutral_adj,
                'pos_verb_present': pos_verb_present, 'neg_verb_present': neg_verb_present,
                'neutral_verb_present': neutral_verb_present, 'pos_verb_past': pos_verb_past,
                'neg_verb_past': neg_verb_past, 'neutral_verb_past': neutral_verb_past,
-               'neutral_words': neutral_words}
+               'neutral_words': neutral_words, 'object_words': object_words}
 
     # Add data to the Editor
     editor.add_lexicon('pos_adj', pos_adj, overwrite=True)
@@ -87,6 +89,7 @@ def load_editor(editor: Editor, suite_name: str) -> Tuple[Editor, dict]:
     editor.add_lexicon('pos_verb', pos_verb_present + pos_verb_past, overwrite=True)
     editor.add_lexicon('neg_verb', neg_verb_present + neg_verb_past, overwrite=True)
     editor.add_lexicon('neutral_verb', neutral_verb_present + neutral_verb_past, overwrite=True)
+    editor.add_lexicon('object_words', object_words, overwrite=True)
 
     # Customize lexicon to the data set used
     if suite_name == "airline_tweets":
@@ -163,11 +166,12 @@ def create_suite_file_paths(root_path: PurePath, keys: Tuple[str, ...]) -> dict:
     return test_suite_paths
 
 
-def build_all_test_suites(sentences: List[str], lexicon, editor: Editor, save_path: PurePath,
+def build_all_test_suites(sentences: List[str], labels: List[str], lexicon, editor: Editor, save_path: PurePath,
                           test_suite_names: Tuple[str, ...]) -> tuple:
     """
     If this function is run, it will create and build all the suites in test_suite_names.
     :param sentences: List of sentence examples
+    :param labels: List of labels corresponding to the sentences
     :param lexicon: lexicon loaded to the Editor()
     :param editor: Editor() that is loaded with lexicon
     :param test_suite_names: List[str] of all the test suite names to build.
@@ -194,8 +198,8 @@ def build_all_test_suites(sentences: List[str], lexicon, editor: Editor, save_pa
     # Test type: Invariance - Invariance test (INV) is when we apply label-preserving perturbations to inputs and
     #                         expect the model prediction to remain the same.
     # Capability: Vocabulary (neutral words changed)
-    test_name_invariance_neutral_words = "invariance_neutral_words"
-    n = 5
+    test_name_invariance_neutral_words = "INV_Vocabulary_neutral_word_change"
+    n = 100
     if test_name_invariance_neutral_words in test_suite_names:
         print(f"Creating test: {test_name_invariance_neutral_words}")
         inv_neutral_suite = create_invariance_test_change_neutral_words(TestSuite(), sentences, lexicon,
@@ -203,8 +207,8 @@ def build_all_test_suites(sentences: List[str], lexicon, editor: Editor, save_pa
         tests[test_name_invariance_neutral_words] = {"suite": inv_neutral_suite, "samples": n}
 
     ### TEST 2 ###
-    test_name_positive_phrases = "directional_positive_phrases"
-    n = 5
+    test_name_positive_phrases = "DIR_Vocabulary_add_positive_phrases"
+    n = 5_000
     if test_name_positive_phrases in test_suite_names:
         print(f"Creating test: {test_name_positive_phrases}")
         pos_suite = create_directional_expression_test_add_positive_phrases(TestSuite(), sentences,
@@ -212,8 +216,8 @@ def build_all_test_suites(sentences: List[str], lexicon, editor: Editor, save_pa
         tests[test_name_positive_phrases] = {"suite": pos_suite, "samples": n}
 
     ### TEST 3 ###
-    test_name_negative_phrases = "directional_negative_phrases"
-    n = 5
+    test_name_negative_phrases = "DIR_Vocabulary_add_negative_phrases"
+    n = 5_000
     if test_name_negative_phrases in test_suite_names:
         print(f"Creating test: {test_name_negative_phrases}")
         neg_suite = create_directional_expression_test_add_negative_phrases(TestSuite(), sentences,
@@ -224,10 +228,10 @@ def build_all_test_suites(sentences: List[str], lexicon, editor: Editor, save_pa
     # TODO finish this test
     # Test type: Minimum Functionality Test (MFT) - used to verify the model has specific capabilities.
     # Capability: Vocabulary, Can the model handle negation?
-    test_name_mft_negation = "mft_negation"
-    n = 5
+    test_name_mft_negation = "MFT_Vocabulary_word_negation"
+    n = 5_000
     if test_name_mft_negation in test_suite_names:
-        mft_negation_suite = create_mft_test_negation(TestSuite(), sentences, lexicon, editor=editor, example_count=n)
+        mft_negation_suite = create_mft_test_negation(TestSuite(), sentences, labels, lexicon, editor=editor, example_count=n)
         tests[test_name_mft_negation] = {"suite": mft_negation_suite, "samples": n}
 
     # Make directory if missing
@@ -304,18 +308,26 @@ class RunningParametersAirlineTweets:
 @dataclass
 class RunningParametersAmazonReviews:
     run_tests_from_pkl: bool = False
-    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_1exs.csv"
+    data_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data.csv"
     label_file_path: PurePath = PROJECT_ROOT / "data" / "sentiment" / "amazon_reviews" / "test_data_labels.pt"
     prediction_file_path: PurePath = PROJECT_ROOT / "predictions" / "sentiment" / "amazon_reviews" / "bert_trained" / "bert_multilingual.txt"
-    suite_save_root: PurePath = PROJECT_ROOT / "test_suites" / "sentiment_testing"
+    suite_save_root: PurePath = PROJECT_ROOT / "test_suites" / "sentiment"
     suite_file_name: str = "test_suite_sentiment_amazon_reviews.pkl"
     max_sequence_length: int = 75
     model_path: PurePath = PROJECT_ROOT / "models" / "sentiment" / "bert_multilingual_amazon_reviews_hugging"
     device: str = "cpu"
-    # Choose the tests to run. This can take a long time, depending on the example count in the TestSuite.
-    test_names = ("invariance_neutral_words", "directional_positive_phrases", "directional_negative_phrases") # "mft_negation"
-    # Choose to rebuild all of the test_names test suites. This can take a long time, depending on the TestSuite.
-    rebuild_test_suites: bool = True
+    # Choose the tests to run, put them in a Tuple[str, ...].
+    # This can take a long time, depending on the example count in the TestSuite.
+    # Full list:
+    #   "MFT_Vocabulary_word_negation"
+    #   "MFT_Vocabulary_add negative phrases"
+    #   "INV_Vocabulary_neutral_word_change"
+    #   "DIR_Vocabulary_add_negative_phrases"
+    #   "DIR_Vocabulary_add_positive_phrases"
+    test_names: tuple = ("MFT_Vocabulary_word_negation", "INV_Vocabulary_neutral_word_change", "DIR_Vocabulary_add_negative_phrases", "DIR_Vocabulary_add_positive_phrases")
+    # Choose to rebuild all test suites in the test_names tuple.
+    # This can take a long time, depending on the TestSuite.
+    rebuild_test_suites: bool = False
 
 
 if __name__ == "__main__":
@@ -345,7 +357,8 @@ if __name__ == "__main__":
 
         # Rebuild the test suites
         print("Rebuilding test suites...")
-        test_suites, test_suite_paths = build_all_test_suites(sentences, lexicon, editor, save_path=pars.suite_save_root,
+        test_suites, test_suite_paths = build_all_test_suites(sentences, labels, lexicon, editor,
+                                                              save_path=pars.suite_save_root,
                                                               test_suite_names=pars.test_names)
     else:
         # Create a dictionary of paths to the test suites
