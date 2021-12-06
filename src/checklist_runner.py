@@ -13,6 +13,7 @@ from mft_test_suites import create_mft_negated_negative, create_mft_negated_posi
 from invariance_test_suites import create_invariance_test_change_neutral_words
 from direction_test_suites import create_directional_expression_test_add_positive_phrases, \
     create_directional_expression_test_add_negative_phrases
+from ner_test_suites import create_ner_switch_names, create_ner_switch_locations
 
 PROJECT_ROOT = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -167,7 +168,7 @@ def build_all_test_suites(sentences: List[str], labels: List[str], lexicon, edit
     """
     tests = {}
 
-    ### TEST 1 ###
+    # TEST 1 -----------------
     # Test type: Invariance - Invariance test (INV) is when we apply label-preserving perturbations to inputs and
     #                         expect the model prediction to remain the same.
     # Capability: Vocabulary (neutral words changed)
@@ -179,7 +180,7 @@ def build_all_test_suites(sentences: List[str], labels: List[str], lexicon, edit
                                                                         editor=editor, example_count=n)
         tests[test_name_invariance_neutral_words] = {"suite": inv_neutral_suite, "samples": n}
 
-    ### TEST 2 ###
+    # TEST 2 -----------------
     test_name_positive_phrases = "DIR_Vocabulary_add_positive_phrases"
     n = 5_000
     if test_name_positive_phrases in test_suite_names:
@@ -188,7 +189,7 @@ def build_all_test_suites(sentences: List[str], labels: List[str], lexicon, edit
                                                                             editor=editor, example_count=n)
         tests[test_name_positive_phrases] = {"suite": pos_suite, "samples": n}
 
-    ### TEST 3 ###
+    # TEST 3 -----------------
     test_name_negative_phrases = "DIR_Vocabulary_add_negative_phrases"
     n = 5_000
     if test_name_negative_phrases in test_suite_names:
@@ -197,19 +198,35 @@ def build_all_test_suites(sentences: List[str], labels: List[str], lexicon, edit
                                                                             editor=editor, example_count=n)
         tests[test_name_negative_phrases] = {"suite": neg_suite, "samples": n}
 
-    ### Test 4 ###
+    # TEST 4 -----------------
     test_name_mft_negation = "MFT_Negation_negated_positive"
     n = 5_000
     if test_name_mft_negation in test_suite_names:
-        mft_negation_suite = create_mft_negated_positive(TestSuite(), sentences, labels, lexicon, editor=editor, example_count=n)
+        mft_negation_suite = create_mft_negated_positive(TestSuite(), sentences, labels, lexicon, editor=editor,
+                                                         example_count=n)
         tests[test_name_mft_negation] = {"suite": mft_negation_suite, "samples": n}
 
-    ### Test 5 ###
+    # TEST 5 -----------------
     test_name_mft_negation = "MFT_Negation_negated_negative"
     n = 5_000
     if test_name_mft_negation in test_suite_names:
-        mft_negation_suite = create_mft_negated_negative(TestSuite(), sentences, labels, lexicon, editor=editor, example_count=n)
+        mft_negation_suite = create_mft_negated_negative(TestSuite(), sentences, labels, lexicon, editor=editor,
+                                                         example_count=n)
         tests[test_name_mft_negation] = {"suite": mft_negation_suite, "samples": n}
+
+    # TEST 6 -----------------
+    test_name_mft_negation = "NER_Switching_Names"
+    n = 500
+    if test_name_mft_negation in test_suite_names:
+        ner_names_suite = create_ner_switch_names(TestSuite(), sentences, example_count=n)
+        tests[test_name_mft_negation] = {"suite": ner_names_suite, "samples": n}
+
+    # TEST 7 -----------------
+    test_name_mft_negation = "NER_Switching_Locations"
+    n = 750
+    if test_name_mft_negation in test_suite_names:
+        ner_locations_suite = create_ner_switch_locations(TestSuite(), sentences, example_count=n)
+        tests[test_name_mft_negation] = {"suite": ner_locations_suite, "samples": n}
 
     # Make directory if missing
     if not os.path.isdir(save_path):
@@ -298,10 +315,11 @@ class RunningParametersAmazonReviews:
     #   "MFT_Negation_negated_positive"
     #   "MFT_Negation_negated_negative"
     #   "NER_Switching_Names"
+    #   "NER_Switching_Locations"
     #   "INV_Vocabulary_neutral_word_change"
     #   "DIR_Vocabulary_add_negative_phrases"
     #   "DIR_Vocabulary_add_positive_phrases"
-    test_names: tuple = ("MFT_Negation_negated_negative",)
+    test_names: tuple = ("NER_Switching_Locations",)
     # Choose to rebuild all test suites in the test_names tuple.
     # This can take a long time, depending on the TestSuite.
     rebuild_test_suites: bool = True
