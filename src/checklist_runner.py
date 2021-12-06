@@ -307,6 +307,10 @@ class RunningParametersAmazonReviews:
     prediction_file_path: PurePath = PROJECT_ROOT / "predictions" / "sentiment" / "amazon_reviews" / "bert_trained" / "bert_multilingual.txt"
     suite_save_root: PurePath = PROJECT_ROOT / "test_suites" / "sentiment"
     max_sequence_length: int = 75
+    # Select the model to run
+    # Full list:
+    #   nlptown/bert-base-multilingual-uncased-sentiment
+    #   PROJECT_ROOT / "models" / "sentiment" / "bert_multilingual_amazon_reviews_hugging"
     model_path: PurePath = PROJECT_ROOT / "models" / "sentiment" / "bert_multilingual_amazon_reviews_hugging"
     device: str = "cpu"
     # Choose the tests to run, put them in a Tuple[str, ...].
