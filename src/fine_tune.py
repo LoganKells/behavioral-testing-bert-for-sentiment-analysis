@@ -72,15 +72,18 @@ def eval_model(model, test_data_loader):
     metric = load_metric("accuracy")
     model.eval()
 
-    for batch in test_data_loader:
-        batch = {k: v.to(device) for k, v in batch.items()}
+    for data, label in test_data_loader:
+        data, label = data.to(device), label.to(device)
         with torch.no_grad():
-            outputs = model(**batch)
+            output = model(data, labels=label)
 
-        logits = outputs.logits
-        predictions = torch.argmax(logits, dim=-1)
-        metric.add_batch(predictions=predictions, references=batch["labels"])
+        # Generate probability distribution over the classes (5 classes)
+        logits = output.logits
+        probabilities = torch.exp(logits.detach())
+        probabilities = torch.softmax(probabilities, dim=1)
+        label_prediction = torch.argmax(probabilities, dim=-1)
 
+        metric.add_batch(predictions=label_prediction, references=label)
     metric.compute()
 
 
@@ -90,8 +93,8 @@ def get_device():
 
 @dataclass
 class TrainingParameters:
-    learning_rate: float = 1e-5
-    epochs: int = 1
+    learning_rate: float = 1e-4
+    epochs: int = 3
     num_works: int = 6
     batch_size: int = 32
     device: str = "cpu"
